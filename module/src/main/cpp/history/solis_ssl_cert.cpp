@@ -112,9 +112,12 @@ void write2File(char* buf) {
     FILE *fp = NULL;
 
     fp = fopen("/data/test.txt", "w+");
-    fprintf(fp, "This is testing for fprintf...\n");
-    fputs("This is testing for fputs...\n", fp);
-    fclose(fp);
+
+    if (fp) {
+        fputs(buf, fp);
+        fclose(fp);
+    }
+
 
 }
 

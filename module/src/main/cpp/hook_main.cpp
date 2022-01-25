@@ -3,6 +3,7 @@
 //
 
 /*
+ * native 笔记
  * dlopen: 打开一个库，获取句柄
  * dlsym: 在打开的库中查找符号的值，返回地址
  */
@@ -73,7 +74,6 @@ unsigned long get_module_base(const char* module_name)
                 // 获取 pch 中的长整型(long)数字，即 module_name 的基址
                 addr = strtoul(pch, nullptr, 16);
                 // 为什么地址为 0x8000 时不算?
-                // https://stackoverflow.com/questions/26237681/what-is-at-physical-memory-0x8000-32kb-to-0x10000-1mb-on-linux
                 if (addr == 0x8000)
                     addr = 0;
                 break;
@@ -108,16 +108,6 @@ char* getString(char* buf, int length) {
     return str;
 }
 
-void write2File(char* buf) {
-    FILE *fp = NULL;
-
-    fp = fopen("/tmp/test.txt", "w+");
-    fprintf(fp, "This is testing for fprintf...\n");
-    fputs("This is testing for fputs...\n", fp);
-    fclose(fp);
-
-}
-
 char* getByteString(uint8_t* buf, size_t length) {
     char* str = (char*)malloc(length * 2 + 1);
     memset(str, 0x00, length * 2 + 1);
@@ -131,15 +121,46 @@ char* getByteString(uint8_t* buf, size_t length) {
     return str;
 }
 
+void write2File(const char* filename, char* buf) {
+    FILE *fp = nullptr;
+    char path[256];
+    memset(path, 0x00, 256);
+    sprintf(path, "/sdcard/Download/%s", filename);
+
+    fp = fopen(path, "a+");
+
+    if (fp) {
+        // 在buf结尾处添加\n
+        size_t length = strlen(buf);
+        char buf2[length + 1];
+        memset(path, 0x00, length);
+        sprintf(buf2, "%s\n", buf);
+        fputs(buf2, fp);
+        fclose(fp);
+    } else {
+        LOGE("Error: [%d] %s", errno, strerror(errno));
+    }
+}
+
+char* readFromFile(const char* path) {
+    FILE *fp = nullptr;
+    fp = fopen(path, "r");
+
+    if (fp) {
+        fclose(fp);
+    } else {
+        LOGE("Error: [%d] %s", errno, strerror(errno));
+    }
+}
+
 typedef void* (*dlopen_type)(const char* name,
                              int flags,
-                             //const void* extinfo,
+        //const void* extinfo,
                              const void* caller_addr);
 dlopen_type dlopen_backup = nullptr;
-/// 被替换的 dlopen 函数，这里只用于寻找 "libil2cpp.so" 的句柄
 void* dlopen_(const char* name,
               int flags,
-              //const void* extinfo,
+        //const void* extinfo,
               const void* caller_addr){
     // 调用原函数获取句柄
     void* handle = dlopen_backup(name, flags, /*extinfo,*/ caller_addr);
@@ -155,22 +176,27 @@ void* dlopen_(const char* name,
 }
 
 // FIXME: ReturnType Args
-typedef cSharpString* (*Hook)(void* self, void* methodInfo);
+typedef cSharpByteArray* (*Hook)(void* methodInfo);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpString* hook(void* self, void* methodInfo){
+cSharpByteArray* hook(void* methodInfo){
     if(backup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("====== MAGIC SHOW BEGINS ======");
     // 原始调用
-    cSharpString* r = backup(self, methodInfo);
-    char* str = getString(r->buf, r->length);
+    cSharpByteArray* r = backup(methodInfo);
+    LOGE("result at %lx", (long)r);
+    char* str = getByteString(r->buf, r->length);
+    LOGE("value is %s", str);
 
-    LOGE("%s", str);
+    write2File("test.txt", str);
+
+    free(str);
 
     return r;
 }
+
 
 
 void hook_each(unsigned long rel_addr, void* hook, void** backup_){
@@ -238,7 +264,6 @@ void *hack_thread(void *arg)
     il2cpp_image_get_class_count_ il2cpp_image_get_class_count = (il2cpp_image_get_class_count_)dlsym(il2cpp_handle, "il2cpp_image_get_class_count");
     il2cpp_image_get_class_ il2cpp_image_get_class = (il2cpp_image_get_class_)dlsym(il2cpp_handle, "il2cpp_image_get_class");
     il2cpp_class_get_methods_ il2cpp_class_get_methods = (il2cpp_class_get_methods_)dlsym(il2cpp_handle, "il2cpp_class_get_methods");
-    il2cpp_class_get_nested_types_ il2cpp_class_get_nested_types = (il2cpp_class_get_nested_types_)dlsym(il2cpp_handle, "il2cpp_class_get_nested_types");
 
     sleep(2);
     LOGW("hack game begin");
@@ -247,9 +272,8 @@ void *hack_thread(void *arg)
     // 获取当前 domain 中的所有 assembly
     const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
-
     // FIXME: Assembly Name
-    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
+    while(strcmp((*assembly_list)->aname.name, "Oz.GameFramework.Runtime") != 0){
         LOGD("Assembly name: %s", (*assembly_list)->aname.name);
         assembly_list++;
     }
@@ -258,52 +282,33 @@ void *hack_thread(void *arg)
     const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
     LOGI("image got at %lx", (long)image);
 
-
-//    // 打印该 assembly 下所有类名
-//    Il2CppClass* clas;
-//    size_t count = il2cpp_image_get_class_count(image);
-//    LOGI("count class %ld", (long)count);
-//    for(size_t i = 0; i < count; i++) {
-//        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
-//        if (strcmp(clas->name, "Serializer") == 0) {
-//            LOGI("one class %s", clas->name);
-//            LOGI("one class %s, ns is %s, at %lx", clas->name, clas->namespaze, (long)clas);
-//            break;
-//        }
-//    }
-//    Il2CppClass* clazz = clas;
-
+    /* 获取内部类方法，暂时没找到其他办法
+    Il2CppClass* clas;
+    size_t count = il2cpp_image_get_class_count(image);
+    for(size_t i = 0; i < count; i++) {
+        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
+        LOGI("one class %s", clas->name);
+        if (strcmp(clas->name, "LapisExtern") == 0) {
+            break;
+        }
+    }
+    Il2CppClass* clazz = clas;
+    */
 
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "Solis.Common.Network", "Api");
+    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameFramework.Runtime", "AppConst");
+
     LOGI("clazz got at %lx", (long)clazz);
-    Il2CppClass* final_clazz = clazz;
-
-    // FIXME: is nested class
-    bool flag = false;
-    if (flag) {
-        // 注意：clazz->nested_type_count 可能不是count，需要验证结构体正确性
-        uint16_t nested_type_count = clazz->nested_type_count;
-        LOGI("nested_type_count %d", nested_type_count);
-
-        for (int i = 0; i < nested_type_count; ++i) {
-            Il2CppClass *c = clazz->nestedTypes[i];
-            const char *nst_name = c->name;
-            LOGI("one nested class named %s", nst_name);
-            // FIXME: nested class name
-            if (strcmp(nst_name, "Serializer") == 0) {
-                final_clazz = c;
-                break;
-            }
-        }
-    }
-
     // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
     // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
     // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(final_clazz, "GetSSLRootCertificates", -1);
+    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "get_rgbKey", -1);
     LOGI("methodInfo got at %lx", (long)methodInfo);
+
+//    void* *it = (void* *)malloc(1);
+//    MethodInfo* m = (MethodInfo*)il2cpp_class_get_methods(clazz, it);
+//    LOGI("methodInfo got at %lx, name %s", (long)m, m->name);
 
     unsigned long addr = (unsigned long)methodInfo->methodPointer;
     LOGI("method got at %lx", addr);
