@@ -92,7 +92,7 @@ struct cSharpByteArray {
 
 struct cSharpString {
     size_t address; // size_t 在 arm64 中占8字节
-    size_t nothing;
+    size_t nothing; // 不知为何，在android中看内存有这段，而在pc中查看内存时无这段
     int length;
     char buf[4096];
 };
@@ -108,17 +108,61 @@ char* getString(char* buf, int length) {
     return str;
 }
 
-void write2File(char* buf) {
-    FILE *fp = NULL;
+/// 以w+模式写文件
+void write2File(const char* filename, char* buf) {
+    FILE *fp = nullptr;
+    char path[256];
+    memset(path, 0x00, 256);
+    sprintf(path, "/sdcard/Download/%s", filename);
 
-    fp = fopen("/data/test.txt", "w+");
+    fp = fopen(path, "w+");
 
     if (fp) {
-        fputs(buf, fp);
+        // 在buf结尾处添加\n
+        size_t length = strlen(buf);
+        char buf2[length + 1];
+        memset(path, 0x00, length);
+        sprintf(buf2, "%s\n", buf);
+        fputs(buf2, fp);
         fclose(fp);
+        LOGI("Write file completed.");
+    } else {
+        LOGE("Error: [%d] %s", errno, strerror(errno));
     }
+}
 
+/// 读取文本文件到字符串
+char* readFromFile(const char* path) {
+    FILE *fp = nullptr;
+    fp = fopen(path, "r");
+    char* buf;
 
+    if (fp) {
+        LOGI("Open file fp at %lx", (long)fp);
+        fseek(fp, 0, SEEK_END);
+        long size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        LOGI("File size is %ld", size);
+
+        buf = (char*)malloc(size);
+        memset(buf, 0x00, size);
+
+        char c;
+        int i = 0;
+        while (1) {
+            c = fgetc(fp);
+            if (feof(fp)) {
+                break;
+            }
+            *(buf + i++) = c;
+        }
+        fclose(fp);
+    } else {
+        LOGE("Error: [%d] %s", errno, strerror(errno));
+    }
+    LOGI("Read file completed.");
+    return buf;
 }
 
 char* getByteString(uint8_t* buf, size_t length) {
@@ -168,6 +212,8 @@ cSharpString* hook(void* self, void* methodInfo){
     LOGI("====== MAGIC SHOW BEGINS ======");
     // 原始调用
     cSharpString* r = backup(self, methodInfo);
+
+
     char* str = getString(r->buf, r->length);
 
     LOGE("%s", str);

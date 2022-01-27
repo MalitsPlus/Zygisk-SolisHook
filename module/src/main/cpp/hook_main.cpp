@@ -121,13 +121,14 @@ char* getByteString(uint8_t* buf, size_t length) {
     return str;
 }
 
+/// 以w+模式写文件
 void write2File(const char* filename, char* buf) {
     FILE *fp = nullptr;
     char path[256];
     memset(path, 0x00, 256);
     sprintf(path, "/sdcard/Download/%s", filename);
 
-    fp = fopen(path, "a+");
+    fp = fopen(path, "w+");
 
     if (fp) {
         // 在buf结尾处添加\n
@@ -137,20 +138,44 @@ void write2File(const char* filename, char* buf) {
         sprintf(buf2, "%s\n", buf);
         fputs(buf2, fp);
         fclose(fp);
+        LOGI("Write file completed.");
     } else {
         LOGE("Error: [%d] %s", errno, strerror(errno));
     }
 }
 
+/// 读取文本文件到字符串
 char* readFromFile(const char* path) {
     FILE *fp = nullptr;
     fp = fopen(path, "r");
+    char* buf;
 
     if (fp) {
+        LOGI("Open file fp at %lx", (long)fp);
+        fseek(fp, 0, SEEK_END);
+        long size = ftell(fp);
+        fseek(fp, 0, SEEK_SET);
+
+        LOGI("File size is %ld", size);
+
+        buf = (char*)malloc(size);
+        memset(buf, 0x00, size);
+
+        char c;
+        int i = 0;
+        while (1) {
+            c = fgetc(fp);
+            if (feof(fp)) {
+                break;
+            }
+            *(buf + i++) = c;
+        }
         fclose(fp);
     } else {
         LOGE("Error: [%d] %s", errno, strerror(errno));
     }
+    LOGI("Read file completed.");
+    return buf;
 }
 
 typedef void* (*dlopen_type)(const char* name,
@@ -176,22 +201,23 @@ void* dlopen_(const char* name,
 }
 
 // FIXME: ReturnType Args
-typedef cSharpByteArray* (*Hook)(void* methodInfo);
+typedef cSharpString* (*Hook)(void* instance, cSharpString* src, void* methodInfo);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpByteArray* hook(void* methodInfo){
+cSharpString* hook(void* instance, cSharpString *src, void* methodInfo){
     if(backup == nullptr){
-        LOGE("backup DOES NOT EXIST");
+        LOGE("Riru-hook: backup DOES NOT EXIST");
     }
-    LOGI("====== MAGIC SHOW BEGINS ======");
+    LOGI("Riru-hook: ====== MAGIC SHOW BEGINS ======");
+
     // 原始调用
-    cSharpByteArray* r = backup(methodInfo);
-    LOGE("result at %lx", (long)r);
-    char* str = getByteString(r->buf, r->length);
-    LOGE("value is %s", str);
+    cSharpString* r = backup(instance, src, methodInfo);
+    LOGE("Riru-hook: got result at %lx", (long)r);
+    LOGE("Riru-hook: length is %d", r->length);
 
-    write2File("test.txt", str);
+    char* str = getString(r->buf, r->length);
 
+    LOGE("Riru-hook: string is %s", str);
     free(str);
 
     return r;
@@ -273,7 +299,7 @@ void *hack_thread(void *arg)
     const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
     // FIXME: Assembly Name
-    while(strcmp((*assembly_list)->aname.name, "Oz.GameFramework.Runtime") != 0){
+    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
         LOGD("Assembly name: %s", (*assembly_list)->aname.name);
         assembly_list++;
     }
@@ -297,13 +323,13 @@ void *hack_thread(void *arg)
 
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameFramework.Runtime", "AppConst");
+    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameKit.Version", "AssetBundleInfo");
 
     LOGI("clazz got at %lx", (long)clazz);
     // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
     // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
     // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "get_rgbKey", -1);
+    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "GetDownloadPath", -1);
     LOGI("methodInfo got at %lx", (long)methodInfo);
 
 //    void* *it = (void* *)malloc(1);
