@@ -201,24 +201,27 @@ void* dlopen_(const char* name,
 }
 
 // FIXME: ReturnType Args
-typedef cSharpString* (*Hook)(void* instance, cSharpString* src, void* methodInfo);
+typedef cSharpByteArray* (*Hook)(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpString* hook(void* instance, cSharpString *src, void* methodInfo){
+cSharpByteArray* hook(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo){
     if(backup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("====== MAGIC SHOW BEGINS ======");
 
     // 原始调用
-    cSharpString* r = backup(instance, src, methodInfo);
-    LOGE("got result at %lx", (long)r);
-    LOGE("length is %d", r->length);
+    cSharpByteArray* r = backup(instance, src, decryptCode, decryptParameter, methodInfo);
+    LOGE("result at %lx", (long)r);
 
-    char* str = getString(r->buf, r->length);
+    char* str_decryptCode = getString(decryptCode->buf, decryptCode->length);
+    char* str_decryptParameter = getString(decryptParameter->buf, decryptParameter->length);
 
-    LOGE("string is %s", str);
-    free(str);
+    LOGE("decryptCode is %s", str_decryptCode);
+    LOGE("decryptParameter is %s", str_decryptParameter);
+
+    free(str_decryptCode);
+    free(str_decryptParameter);
 
     return r;
 }
@@ -299,19 +302,18 @@ void *hack_thread(void *arg)
     const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
     // FIXME: Assembly Name
-    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
-        LOGD("Assembly name: %s", (*assembly_list)->aname.name);
-        assembly_list++;
-    }
-    LOGW("Assembly name: %s", (*assembly_list)->aname.name);
-    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
-    const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
-    LOGI("image got at %lx", (long)image);
+//    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
+//        LOGD("Assembly name: %s", (*assembly_list)->aname.name);
+//        assembly_list++;
+//    }
+//    LOGW("Assembly name: %s", (*assembly_list)->aname.name);
+//    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
+//    const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
+//    LOGI("image got at %lx", (long)image);
 
     /* 获取内部类方法，暂时没找到其他办法
     Il2CppClass* clas;
     size_t count = il2cpp_image_get_class_count(image);
-    LOGI("count class %ld", (long)count);
     for(size_t i = 0; i < count; i++) {
         clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
         LOGI("one class %s", clas->name);
@@ -324,20 +326,21 @@ void *hack_thread(void *arg)
 
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameKit.Version", "AssetBundleInfo");
+//    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameKit.Version", "AssetBundleInfo");
 
-    LOGI("clazz got at %lx", (long)clazz);
+//    LOGI("clazz got at %lx", (long)clazz);
     // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
     // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
     // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "GetDownloadPath", -1);
-    LOGI("methodInfo got at %lx", (long)methodInfo);
+//    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "GetDownloadPath", -1);
+//    LOGI("methodInfo got at %lx", (long)methodInfo);
 
 //    void* *it = (void* *)malloc(1);
 //    MethodInfo* m = (MethodInfo*)il2cpp_class_get_methods(clazz, it);
 //    LOGI("methodInfo got at %lx, name %s", (long)m, m->name);
 
-    unsigned long addr = (unsigned long)methodInfo->methodPointer;
+//    unsigned long addr = (unsigned long)methodInfo->methodPointer;
+    unsigned long addr = base_addr + 0x22803E8;
     LOGI("method got at %lx", addr);
 
     LOGI("start hook target method...");

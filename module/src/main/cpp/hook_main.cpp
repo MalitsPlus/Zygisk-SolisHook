@@ -92,7 +92,7 @@ struct cSharpByteArray {
 
 struct cSharpString {
     size_t address; // size_t 在 arm64 中占8字节
-    size_t nothing;
+    size_t nothing; // 不知为何，在android中看内存有这段，而在pc中查看内存时无这段
     int length;
     char buf[4096];
 };
@@ -122,23 +122,42 @@ char* getByteString(uint8_t* buf, size_t length) {
 }
 
 /// 以w+模式写文件
-void write2File(const char* filename, char* buf) {
+void write2File(const char* filename, const char* buf) {
     FILE *fp = nullptr;
     char path[256];
     memset(path, 0x00, 256);
     sprintf(path, "/sdcard/Download/%s", filename);
 
-    fp = fopen(path, "w+");
+    fp = fopen(path, "a+");
 
     if (fp) {
         // 在buf结尾处添加\n
         size_t length = strlen(buf);
         char buf2[length + 1];
-        memset(path, 0x00, length);
         sprintf(buf2, "%s\n", buf);
         fputs(buf2, fp);
         fclose(fp);
         LOGI("Write file completed.");
+    } else {
+        LOGE("Error: [%d] %s", errno, strerror(errno));
+    }
+}
+
+/// 以w+模式写文件
+void write2Bin(const char* filename, cSharpByteArray* buf) {
+    FILE *fp = nullptr;
+    char path[256];
+    memset(path, 0x00, 256);
+    sprintf(path, "/sdcard/Download/%s", filename);
+
+    fp = fopen(path, "a+");
+
+    if (fp) {
+        // 在buf结尾处添加\n
+        size_t length = buf->length;
+        fwrite(buf->buf, 1, length, fp);
+        fclose(fp);
+        LOGI("Write binary file completed.");
     } else {
         LOGE("Error: [%d] %s", errno, strerror(errno));
     }
@@ -201,24 +220,27 @@ void* dlopen_(const char* name,
 }
 
 // FIXME: ReturnType Args
-typedef cSharpString* (*Hook)(void* instance, cSharpString* src, void* methodInfo);
+typedef cSharpByteArray* (*Hook)(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpString* hook(void* instance, cSharpString *src, void* methodInfo){
+cSharpByteArray* hook(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo){
     if(backup == nullptr){
-        LOGE("Riru-hook: backup DOES NOT EXIST");
+        LOGE("backup DOES NOT EXIST");
     }
-    LOGI("Riru-hook: ====== MAGIC SHOW BEGINS ======");
+    LOGI("====== MAGIC SHOW BEGINS ======");
 
     // 原始调用
-    cSharpString* r = backup(instance, src, methodInfo);
-    LOGE("Riru-hook: got result at %lx", (long)r);
-    LOGE("Riru-hook: length is %d", r->length);
+    cSharpByteArray* r = backup(instance, src, decryptCode, decryptParameter, methodInfo);
+    LOGE("result at %lx", (long)r);
 
-    char* str = getString(r->buf, r->length);
+    char* str_decryptCode = getString(decryptCode->buf, decryptCode->length);
+    char* str_decryptParameter = getString(decryptParameter->buf, decryptParameter->length);
 
-    LOGE("Riru-hook: string is %s", str);
-    free(str);
+    LOGE("decryptCode is %s", str_decryptCode);
+    LOGE("decryptParameter is %s", str_decryptParameter);
+    free(str_decryptCode);
+    free(str_decryptParameter);
+    write2Bin("al2.bin", r);
 
     return r;
 }
@@ -304,32 +326,32 @@ void *hack_thread(void *arg)
         assembly_list++;
     }
     LOGW("Assembly name: %s", (*assembly_list)->aname.name);
-    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
+//    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
     const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
     LOGI("image got at %lx", (long)image);
 
-    /* 获取内部类方法，暂时没找到其他办法
-    Il2CppClass* clas;
-    size_t count = il2cpp_image_get_class_count(image);
-    for(size_t i = 0; i < count; i++) {
-        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
-        LOGI("one class %s", clas->name);
-        if (strcmp(clas->name, "LapisExtern") == 0) {
-            break;
-        }
-    }
-    Il2CppClass* clazz = clas;
-    */
+    // 获取内部类方法，暂时没找到其他办法
+//    Il2CppClass* clas;
+//    size_t count = il2cpp_image_get_class_count(image);
+//    for(size_t i = 0; i < count; i++) {
+//        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
+//        LOGI("one class %s", clas->name);
+//        write2File("al2class.txt", clas->name);
+//        if (strcmp(clas->name, "LoginRequestAPI<TDto>") == 0) {
+//            break;
+//        }
+//    }
+//    Il2CppClass* clazz = clas;
 
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "Oz.GameKit.Version", "AssetBundleInfo");
+    Il2CppClass* clazz = il2cpp_class_from_name(image, "CAUnity", "ProteusConnectionParams");
 
     LOGI("clazz got at %lx", (long)clazz);
     // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
     // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
     // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "GetDownloadPath", -1);
+    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "_DecryptBinary", -1);
     LOGI("methodInfo got at %lx", (long)methodInfo);
 
 //    void* *it = (void* *)malloc(1);
@@ -337,6 +359,7 @@ void *hack_thread(void *arg)
 //    LOGI("methodInfo got at %lx, name %s", (long)m, m->name);
 
     unsigned long addr = (unsigned long)methodInfo->methodPointer;
+//    unsigned long addr = base_addr + 0x24377D8;
     LOGI("method got at %lx", addr);
 
     LOGI("start hook target method...");

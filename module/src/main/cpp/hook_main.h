@@ -16,14 +16,14 @@ extern int enhanced_dlclose(void *handle);
 }
 
 static int enable_hack;
-static const char* game_name = "com.klab.lapis"; // FIXME: EDIT THIS TO YOUR TARGET GAME'S NAME
+static const char* game_name = "jp.co.cyberagent.alternajp"; // FIXME: EDIT THIS TO YOUR TARGET GAME'S NAME
 static unsigned long base_addr = 0;
 static void* il2cpp_handle = nullptr;
 int isGame(JNIEnv *env, jstring appDataDir);
 unsigned long get_module_base(const char* module_name);
 void *hack_thread(void *arg);
 
-#define LOG_TAG "UNITYHOOK_lapis"
+#define LOG_TAG "UNITYHOOK"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 #define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
