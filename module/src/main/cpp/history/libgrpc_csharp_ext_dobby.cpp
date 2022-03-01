@@ -3,7 +3,6 @@
 //
 
 /*
- * native 笔记
  * dlopen: 打开一个库，获取句柄
  * dlsym: 在打开的库中查找符号的值，返回地址
  */
@@ -74,6 +73,7 @@ unsigned long get_module_base(const char* module_name)
                 // 获取 pch 中的长整型(long)数字，即 module_name 的基址
                 addr = strtoul(pch, nullptr, 16);
                 // 为什么地址为 0x8000 时不算?
+                // https://stackoverflow.com/questions/26237681/what-is-at-physical-memory-0x8000-32kb-to-0x10000-1mb-on-linux
                 if (addr == 0x8000)
                     addr = 0;
                 break;
@@ -108,56 +108,24 @@ char* getString(char* buf, int length) {
     return str;
 }
 
-char* getByteString(uint8_t* buf, size_t length) {
-    char* str = (char*)malloc(length * 2 + 1);
-    memset(str, 0x00, length * 2 + 1);
-    unsigned short tmp[4096];
-    for (int i = 0; i < length; i++) {
-        tmp[i] = buf[i];
-    }
-    for (int i = 0; i < length; i++) {
-        sprintf(str + i * 2, "%02hx", tmp[i]);
-    }
-    return str;
-}
-
 /// 以w+模式写文件
-void write2File(const char* filename, const char* buf) {
+void write2File(const char* filename, char* buf) {
     FILE *fp = nullptr;
     char path[256];
     memset(path, 0x00, 256);
     sprintf(path, "/sdcard/Download/%s", filename);
 
-    fp = fopen(path, "a+");
+    fp = fopen(path, "w+");
 
     if (fp) {
         // 在buf结尾处添加\n
         size_t length = strlen(buf);
         char buf2[length + 1];
+        memset(path, 0x00, length);
         sprintf(buf2, "%s\n", buf);
         fputs(buf2, fp);
         fclose(fp);
         LOGI("Write file completed.");
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
-    }
-}
-
-/// 以w+模式写文件
-void write2Bin(const char* filename, cSharpByteArray* buf) {
-    FILE *fp = nullptr;
-    char path[256];
-    memset(path, 0x00, 256);
-    sprintf(path, "/sdcard/Download/%s", filename);
-
-    fp = fopen(path, "a+");
-
-    if (fp) {
-        // 在buf结尾处添加\n
-        size_t length = buf->length;
-        fwrite(buf->buf, 1, length, fp);
-        fclose(fp);
-        LOGI("Write binary file completed.");
     } else {
         LOGE("Error: [%d] %s", errno, strerror(errno));
     }
@@ -197,11 +165,25 @@ char* readFromFile(const char* path) {
     return buf;
 }
 
+char* getByteString(uint8_t* buf, size_t length) {
+    char* str = (char*)malloc(length * 2 + 1);
+    memset(str, 0x00, length * 2 + 1);
+    unsigned short tmp[4096];
+    for (int i = 0; i < length; i++) {
+        tmp[i] = buf[i];
+    }
+    for (int i = 0; i < length; i++) {
+        sprintf(str + i * 2, "%02hx", tmp[i]);
+    }
+    return str;
+}
+
 typedef void* (*dlopen_type)(const char* name,
                              int flags,
         //const void* extinfo,
                              const void* caller_addr);
 dlopen_type dlopen_backup = nullptr;
+/// 被替换的 dlopen 函数，这里只用于寻找 "libgrpc_csharp_ext.so" 的句柄
 void* dlopen_(const char* name,
               int flags,
         //const void* extinfo,
@@ -211,40 +193,32 @@ void* dlopen_(const char* name,
     if(!il2cpp_handle){
         LOGI("dlopen: %s", name);
         // 如果是目标 so 库，则将句柄复制保存到自定义的变量中，方便后续使用
-        if(strstr(name, "libil2cpp.so")){
+        if(strstr(name, "libgrpc_csharp_ext.so")){
             il2cpp_handle = handle;
-            LOGI("Got il2cpp handle at %lx", (long)il2cpp_handle);
+            LOGI("dlopen got libgrpc_csharp_ext.so handle at %lx", (long)il2cpp_handle);
         }
     }
     return handle;
 }
 
 // FIXME: ReturnType Args
-typedef cSharpByteArray* (*Hook)(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo);
+typedef int (*Hook)(const char* peer_name, const tsi_peer* peer, void* auth_context);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpByteArray* hook(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo){
+int hook(const char* peer_name, const tsi_peer* peer, void* auth_context){
     if(backup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("====== MAGIC SHOW BEGINS ======");
-
     // 原始调用
-    cSharpByteArray* r = backup(instance, src, decryptCode, decryptParameter, methodInfo);
-    LOGE("result at %lx", (long)r);
-
-    char* str_decryptCode = getString(decryptCode->buf, decryptCode->length);
-    char* str_decryptParameter = getString(decryptParameter->buf, decryptParameter->length);
-
-    LOGE("decryptCode is %s", str_decryptCode);
-    LOGE("decryptParameter is %s", str_decryptParameter);
-    free(str_decryptCode);
-    free(str_decryptParameter);
-    write2Bin("al2.bin", r);
+    int r = backup(peer_name, peer, auth_context);
+    LOGE("peer_name is %s, at %lx", peer_name, (long)peer_name);
+    LOGE("tsi_peer name is %s, at %lx", peer->properties->name, (long)peer);
+    LOGE("auth_context at %lx", (long)auth_context);
+    LOGE("result is %d", r);
 
     return r;
 }
-
 
 
 void hook_each(unsigned long rel_addr, void* hook, void** backup_){
@@ -275,24 +249,25 @@ void *hack_thread(void *arg)
     LOGI("hack thread: %d", gettid());
     srand(time(nullptr));
     LOGI("start getting loader_dlopen");
-    // 这个symbol_name 是哪来的？？
+    // libdl.so中的__dlopen函数只是将bin/linker中的dlopen函数包装了一下，实际逻辑都在linker中
     void* loader_dlopen = DobbySymbolResolver(nullptr, "__dl__Z9do_dlopenPKciPK17android_dlextinfoPKv");
-    LOGI("loader_dlopen got");
+    LOGI("loader_dlopen got at %lx", (long)loader_dlopen);
 
     LOGI("start hook_each 'loader_dlopen'");
     hook_each((unsigned long)loader_dlopen, (void*)dlopen_, (void**)&dlopen_backup);
     LOGI("hook_each 'loader_dlopen' completed");
 
-    LOGI("start find addr of module 'libil2cpp.so'");
+    LOGI("start finding addr of module 'libgrpc_csharp_ext.so'");
     while (true)
     {
         // 获取 module 基址，找到则跳出循环
-        base_addr = get_module_base("libil2cpp.so");
+        base_addr = get_module_base("libgrpc_csharp_ext.so");
         if (base_addr != 0 && il2cpp_handle != nullptr) {
             break;
         }
     }
-    LOGD("detect libil2cpp.so %lx, start sleep", base_addr);
+    LOGD("detect libgrpc_csharp_ext.so %lx, start sleep", base_addr);
+    LOGD("handle at %lx", (long)il2cpp_handle);
 
     // 获取各个 symbol 的地址，并直接 cast 为可直接调用的函数指针
     // 此处调用的函数全部为 il2cpp 源码中的关键函数，全部可以从 il2cpp 源码中找到具体实现
@@ -312,59 +287,19 @@ void *hack_thread(void *arg)
     il2cpp_image_get_class_count_ il2cpp_image_get_class_count = (il2cpp_image_get_class_count_)dlsym(il2cpp_handle, "il2cpp_image_get_class_count");
     il2cpp_image_get_class_ il2cpp_image_get_class = (il2cpp_image_get_class_)dlsym(il2cpp_handle, "il2cpp_image_get_class");
     il2cpp_class_get_methods_ il2cpp_class_get_methods = (il2cpp_class_get_methods_)dlsym(il2cpp_handle, "il2cpp_class_get_methods");
+    il2cpp_class_get_nested_types_ il2cpp_class_get_nested_types = (il2cpp_class_get_nested_types_)dlsym(il2cpp_handle, "il2cpp_class_get_nested_types");
 
+    auto ssl_check_peer = (ssl_check_peer_)dlsym(il2cpp_handle, "_ZN12_GLOBAL__N_114ssl_check_peerEPKcPK8tsi_peerPN9grpc_core13RefCountedPtrI17grpc_auth_contextEE");
+    LOGI("dlsym at %lx", (long)ssl_check_peer);
+    void* dobby_ssl_check_peer = DobbySymbolResolver(nullptr, "_ZN12_GLOBAL__N_114ssl_check_peerEPKcPK8tsi_peerPN9grpc_core13RefCountedPtrI17grpc_auth_contextEE");
+    LOGD("hd at %lx", (long)dobby_ssl_check_peer);
     sleep(2);
     LOGW("hack game begin");
-    Il2CppDomain* domain = il2cpp_domain_get();
-    unsigned long ass_len = 0;
-    // 获取当前 domain 中的所有 assembly
-    const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
-    // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
-    // FIXME: Assembly Name
-    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
-        LOGD("Assembly name: %s", (*assembly_list)->aname.name);
-        assembly_list++;
-    }
-    LOGW("Assembly name: %s", (*assembly_list)->aname.name);
-//    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
-    const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
-    LOGI("image got at %lx", (long)image);
-
-    // 获取内部类方法，暂时没找到其他办法
-//    Il2CppClass* clas;
-//    size_t count = il2cpp_image_get_class_count(image);
-//    for(size_t i = 0; i < count; i++) {
-//        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
-//        LOGI("one class %s", clas->name);
-//        write2File("al2class.txt", clas->name);
-//        if (strcmp(clas->name, "LoginRequestAPI<TDto>") == 0) {
-//            break;
-//        }
-//    }
-//    Il2CppClass* clazz = clas;
-
-    // 根据 Namespace, Classname 获取 Class
-    // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "CAUnity", "ProteusConnectionParams");
-
-    LOGI("clazz got at %lx", (long)clazz);
-    // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
-    // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
-    // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "_DecryptBinary", -1);
-    LOGI("methodInfo got at %lx", (long)methodInfo);
-
-//    void* *it = (void* *)malloc(1);
-//    MethodInfo* m = (MethodInfo*)il2cpp_class_get_methods(clazz, it);
-//    LOGI("methodInfo got at %lx, name %s", (long)m, m->name);
-
-    unsigned long addr = (unsigned long)methodInfo->methodPointer;
-//    unsigned long addr = base_addr + 0x24377D8;
-    LOGI("method got at %lx", addr);
 
     LOGI("start hook target method...");
-    hook_each(addr, (void*)hook, (void**)&backup);
+    hook_each((unsigned long)dobby_ssl_check_peer, (void*)hook, (void**)&backup);
 
     LOGD("hack game finish");
+
     return nullptr;
 }

@@ -166,6 +166,19 @@ typedef struct MethodInfo {
     Il2CppClass *klass;
 } MethodInfo;
 
+// defied in grpc\src\core\tsi\transport_security_interface.h
+typedef struct tsi_peer_property {
+    char* name;
+    struct {
+        char* data;
+        size_t length;
+    } value;
+} tsi_peer_property;
+
+struct tsi_peer {
+    tsi_peer_property* properties;
+    size_t property_count;
+};
 
 typedef Il2CppDomain* (*il2cpp_domain_get_)();
 typedef const Il2CppAssembly** (*il2cpp_domain_get_assemblies_) (const Il2CppDomain * domain, unsigned long * size);
@@ -177,5 +190,7 @@ typedef size_t (*il2cpp_image_get_class_count_) (const Il2CppImage * image);
 typedef const Il2CppClass* (*il2cpp_image_get_class_) (const Il2CppImage * image, size_t index);
 typedef const MethodInfo* (*il2cpp_class_get_methods_) (Il2CppClass *klass, void* *iter);
 typedef Il2CppClass* (*il2cpp_class_get_nested_types_) (Il2CppClass *klass, void* *iter);
+
+typedef int (*ssl_check_peer_) (const char* peer_name, const tsi_peer* peer, void* auth_context);
 
 #endif

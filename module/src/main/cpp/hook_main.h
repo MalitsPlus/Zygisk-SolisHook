@@ -16,7 +16,7 @@ extern int enhanced_dlclose(void *handle);
 }
 
 static int enable_hack;
-static const char* game_name = "jp.co.cyberagent.alternajp"; // FIXME: EDIT THIS TO YOUR TARGET GAME'S NAME
+static const char* game_name = "game.qualiarts.idolypride"; // FIXME: EDIT THIS TO YOUR TARGET GAME'S NAME
 static unsigned long base_addr = 0;
 static void* il2cpp_handle = nullptr;
 int isGame(JNIEnv *env, jstring appDataDir);

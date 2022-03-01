@@ -3,7 +3,6 @@
 //
 
 /*
- * native 笔记
  * dlopen: 打开一个库，获取句柄
  * dlsym: 在打开的库中查找符号的值，返回地址
  */
@@ -74,6 +73,7 @@ unsigned long get_module_base(const char* module_name)
                 // 获取 pch 中的长整型(long)数字，即 module_name 的基址
                 addr = strtoul(pch, nullptr, 16);
                 // 为什么地址为 0x8000 时不算?
+                // https://stackoverflow.com/questions/26237681/what-is-at-physical-memory-0x8000-32kb-to-0x10000-1mb-on-linux
                 if (addr == 0x8000)
                     addr = 0;
                 break;
@@ -108,56 +108,28 @@ char* getString(char* buf, int length) {
     return str;
 }
 
-char* getByteString(uint8_t* buf, size_t length) {
-    char* str = (char*)malloc(length * 2 + 1);
-    memset(str, 0x00, length * 2 + 1);
-    unsigned short tmp[4096];
-    for (int i = 0; i < length; i++) {
-        tmp[i] = buf[i];
-    }
-    for (int i = 0; i < length; i++) {
-        sprintf(str + i * 2, "%02hx", tmp[i]);
-    }
-    return str;
+char* getCsharpString(cSharpString* sharpString) {
+    return getString(sharpString->buf, sharpString->length);
 }
 
 /// 以w+模式写文件
-void write2File(const char* filename, const char* buf) {
+void write2File(const char* filename, char* buf) {
     FILE *fp = nullptr;
     char path[256];
     memset(path, 0x00, 256);
     sprintf(path, "/sdcard/Download/%s", filename);
 
-    fp = fopen(path, "a+");
+    fp = fopen(path, "w+");
 
     if (fp) {
         // 在buf结尾处添加\n
         size_t length = strlen(buf);
         char buf2[length + 1];
+        memset(path, 0x00, length);
         sprintf(buf2, "%s\n", buf);
         fputs(buf2, fp);
         fclose(fp);
         LOGI("Write file completed.");
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
-    }
-}
-
-/// 以w+模式写文件
-void write2Bin(const char* filename, cSharpByteArray* buf) {
-    FILE *fp = nullptr;
-    char path[256];
-    memset(path, 0x00, 256);
-    sprintf(path, "/sdcard/Download/%s", filename);
-
-    fp = fopen(path, "a+");
-
-    if (fp) {
-        // 在buf结尾处添加\n
-        size_t length = buf->length;
-        fwrite(buf->buf, 1, length, fp);
-        fclose(fp);
-        LOGI("Write binary file completed.");
     } else {
         LOGE("Error: [%d] %s", errno, strerror(errno));
     }
@@ -197,11 +169,25 @@ char* readFromFile(const char* path) {
     return buf;
 }
 
+char* getByteString(uint8_t* buf, size_t length) {
+    char* str = (char*)malloc(length * 2 + 1);
+    memset(str, 0x00, length * 2 + 1);
+    unsigned short tmp[4096];
+    for (int i = 0; i < length; i++) {
+        tmp[i] = buf[i];
+    }
+    for (int i = 0; i < length; i++) {
+        sprintf(str + i * 2, "%02hx", tmp[i]);
+    }
+    return str;
+}
+
 typedef void* (*dlopen_type)(const char* name,
                              int flags,
         //const void* extinfo,
                              const void* caller_addr);
 dlopen_type dlopen_backup = nullptr;
+/// 被替换的 dlopen 函数，这里只用于寻找 "libil2cpp.so" 的句柄
 void* dlopen_(const char* name,
               int flags,
         //const void* extinfo,
@@ -219,32 +205,23 @@ void* dlopen_(const char* name,
     return handle;
 }
 
-// FIXME: ReturnType Args
-typedef cSharpByteArray* (*Hook)(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo);
+// FIXME: ReturnType Argsm
+typedef void (*Hook)(void* self, cSharpString* masterName, cSharpString* saveFilePath, cSharpByteArray* cryptoKey, void* methodInfo, void* method);
 Hook backup = nullptr;
 // FIXME: ReturnType Args
-cSharpByteArray* hook(void* instance, cSharpByteArray* src, cSharpString* decryptCode, cSharpString* decryptParameter, void* methodInfo){
+void hook(void* self, cSharpString* masterName, cSharpString* saveFilePath, cSharpByteArray* cryptoKey, void* methodInfo, void* method){
     if(backup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("====== MAGIC SHOW BEGINS ======");
 
+    LOGI("masterName is %s", getCsharpString(masterName));
+    LOGI("saveFilePath is %s", getCsharpString(saveFilePath));
+    LOGI("cryptoKey is %s", getByteString(cryptoKey->buf, cryptoKey->length));
+
     // 原始调用
-    cSharpByteArray* r = backup(instance, src, decryptCode, decryptParameter, methodInfo);
-    LOGE("result at %lx", (long)r);
-
-    char* str_decryptCode = getString(decryptCode->buf, decryptCode->length);
-    char* str_decryptParameter = getString(decryptParameter->buf, decryptParameter->length);
-
-    LOGE("decryptCode is %s", str_decryptCode);
-    LOGE("decryptParameter is %s", str_decryptParameter);
-    free(str_decryptCode);
-    free(str_decryptParameter);
-    write2Bin("al2.bin", r);
-
-    return r;
+    backup(self, masterName, saveFilePath, cryptoKey, methodInfo, method);
 }
-
 
 
 void hook_each(unsigned long rel_addr, void* hook, void** backup_){
@@ -312,6 +289,7 @@ void *hack_thread(void *arg)
     il2cpp_image_get_class_count_ il2cpp_image_get_class_count = (il2cpp_image_get_class_count_)dlsym(il2cpp_handle, "il2cpp_image_get_class_count");
     il2cpp_image_get_class_ il2cpp_image_get_class = (il2cpp_image_get_class_)dlsym(il2cpp_handle, "il2cpp_image_get_class");
     il2cpp_class_get_methods_ il2cpp_class_get_methods = (il2cpp_class_get_methods_)dlsym(il2cpp_handle, "il2cpp_class_get_methods");
+    il2cpp_class_get_nested_types_ il2cpp_class_get_nested_types = (il2cpp_class_get_nested_types_)dlsym(il2cpp_handle, "il2cpp_class_get_nested_types");
 
     sleep(2);
     LOGW("hack game begin");
@@ -320,46 +298,66 @@ void *hack_thread(void *arg)
     // 获取当前 domain 中的所有 assembly
     const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
+
     // FIXME: Assembly Name
-    while(strcmp((*assembly_list)->aname.name, "Assembly-CSharp") != 0){
+    while(strcmp((*assembly_list)->aname.name, "quaunity-master-manager.Runtime") != 0){
         LOGD("Assembly name: %s", (*assembly_list)->aname.name);
         assembly_list++;
     }
     LOGW("Assembly name: %s", (*assembly_list)->aname.name);
-//    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
+    // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
     const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
     LOGI("image got at %lx", (long)image);
 
-    // 获取内部类方法，暂时没找到其他办法
+
+//    // 打印该 assembly 下所有类名
 //    Il2CppClass* clas;
 //    size_t count = il2cpp_image_get_class_count(image);
+//    LOGI("count class %ld", (long)count);
 //    for(size_t i = 0; i < count; i++) {
 //        clas = (Il2CppClass*)il2cpp_image_get_class(image, i);
-//        LOGI("one class %s", clas->name);
-//        write2File("al2class.txt", clas->name);
-//        if (strcmp(clas->name, "LoginRequestAPI<TDto>") == 0) {
+//        if (strcmp(clas->name, "Serializer") == 0) {
+//            LOGI("one class %s", clas->name);
+//            LOGI("one class %s, ns is %s, at %lx", clas->name, clas->namespaze, (long)clas);
 //            break;
 //        }
 //    }
 //    Il2CppClass* clazz = clas;
 
+
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
-    Il2CppClass* clazz = il2cpp_class_from_name(image, "CAUnity", "ProteusConnectionParams");
-
+    Il2CppClass* clazz = il2cpp_class_from_name(image, "Qua.Master", "DownloadMasterFileInfo");
     LOGI("clazz got at %lx", (long)clazz);
+    Il2CppClass* final_clazz = clazz;
+
+    // FIXME: is nested class
+    bool flag = false;
+    if (flag) {
+        // 注意：clazz->nested_type_count 可能不是count，需要验证结构体正确性
+        uint16_t nested_type_count = clazz->nested_type_count;
+        LOGI("nested_type_count %d", nested_type_count);
+
+        for (int i = 0; i < nested_type_count; ++i) {
+            Il2CppClass *c = clazz->nestedTypes[i];
+            const char *nst_name = c->name;
+            LOGI("one nested class named %s", nst_name);
+            // FIXME: nested class name
+            if (strcmp(nst_name, "Serializer") == 0) {
+                final_clazz = c;
+                break;
+            }
+        }
+    }
+
     // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
     // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
+    // 参数个数为 c# 中的个数
     // FIXME: MethodName ArgsNum
-    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(clazz, "_DecryptBinary", -1);
+    MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(final_clazz, ".ctor", 4);
     LOGI("methodInfo got at %lx", (long)methodInfo);
 
-//    void* *it = (void* *)malloc(1);
-//    MethodInfo* m = (MethodInfo*)il2cpp_class_get_methods(clazz, it);
-//    LOGI("methodInfo got at %lx, name %s", (long)m, m->name);
-
     unsigned long addr = (unsigned long)methodInfo->methodPointer;
-//    unsigned long addr = base_addr + 0x24377D8;
     LOGI("method got at %lx", addr);
 
     LOGI("start hook target method...");
