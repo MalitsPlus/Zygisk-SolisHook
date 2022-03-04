@@ -217,21 +217,18 @@ cSharpByteArray* createAesIV(void *self, cSharpByteArray *secKey, void* header, 
     if(createAesIVBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== CreateAesIV ======\n", txt);
+    LOGI("====== CreateAesIV ======");
 
     if (secKey) {
         char *secKeyStr = getByteString(secKey->buf, secKey->length);
-        sprintf(txt, "%ssecKey is %s\n", txt, secKeyStr);
+        LOGI("secKey is %s", secKeyStr);
     }
     // 原始调用
     cSharpByteArray* r = createAesIVBackup(self, secKey, header, method);
     if (r) {
         char *rBytes = getByteString(r->buf, r->length);
-        sprintf(txt, "%sresult(iv) is %s\n", txt, rBytes);
+        LOGI("result(iv) is %s", rBytes);
     }
-    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -243,18 +240,15 @@ cSharpByteArray* transformFinalBlock(void *self, cSharpByteArray *inputBuffer, i
     if(transformFinalBlockBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== TransformFinalBlock ======\n", txt);
+    LOGI("====== TransformFinalBlock ======");
     if (inputBuffer) {
         char* beforeInputBuf = getByteString(inputBuffer->buf, inputBuffer->length);
-        sprintf(txt, "%sinput buffer(header?) is %s\n", txt, beforeInputBuf);
-        sprintf(txt, "%sinputOffset is %d\n", txt, inputOffset);
-        sprintf(txt, "%sinputCount is %d\n", txt, inputCount);
+        LOGI("input buffer(header?) is %s", beforeInputBuf);
+        LOGI("inputOffset is %d", inputOffset);
+        LOGI("inputCount is %d", inputCount);
     }
     // 原始调用
     cSharpByteArray* r = transformFinalBlockBackup(self, inputBuffer, inputOffset, inputCount, method);
-    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -266,16 +260,13 @@ cSharpByteArray* getHash(void *self, const MethodInfo *method){
     if(getHashBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== GetHash ======\n", txt);
+    LOGI("====== GetHash ======");
     // 原始调用
     cSharpByteArray* r = getHashBackup(self, method);
     if (r) {
         char *rStr = getByteString(r->buf, r->length);
-        sprintf(txt, "%shash(iv?) is %s\n", txt, rStr);
+        LOGI("hash(iv?) is %s", rStr);
     }
-    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -306,34 +297,29 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
     if(getHashBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== Decrypt ======\n", txt);
+    LOGI("====== Decrypt ======");
     if (bytes) {
         char *bytesStr = getByteString(bytes->buf, bytes->length);
-        sprintf(txt, "%soriginal bytes is %s\n", txt, bytesStr);
-        sprintf(txt, "%soriginal bytes length is %d\n", txt, (int)bytes->length);
+        LOGI("original bytes is %s", bytesStr);
+        LOGI("original bytes length is %d", (int)bytes->length);
     }
     if (key) {
         char *keyStr = getByteString(key->buf, key->length);
-        sprintf(txt, "%skey is %s\n", txt, keyStr);
+        LOGI("key is %s", keyStr);
     }
     if (iv) {
         char *ivStr = getByteString(iv->buf, iv->length);
-        sprintf(txt, "%siv is %s\n", txt, ivStr);
+        LOGI("iv is %s", ivStr);
     }
-    sprintf(txt, "%soffset(header length) is %d\n", txt, offset);
-    sprintf(txt, "%smessage length is %d\n", txt, length);
+    LOGI("offset(header length) is %d", offset);
+    LOGI("message length is %d", length);
 
     // 原始调用
     cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
     if (r) {
         char *rStr = getByteString(r->buf, r->length);
-        sprintf(txt, "%sresult is %s\n", txt, rStr);
+        LOGI("result is %s", rStr);
     }
-
-    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
