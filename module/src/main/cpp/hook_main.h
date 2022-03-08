@@ -8,6 +8,7 @@
 #include <android/log.h>
 #include <link.h>
 #include <vector>
+#include "il2cpp.h"
 
 extern "C" {
 extern void *enhanced_dlopen(const char *filename, int flags);
@@ -22,6 +23,9 @@ static void* il2cpp_handle = nullptr;
 int isGame(JNIEnv *env, jstring appDataDir);
 unsigned long get_module_base(const char* module_name);
 void *hack_thread(void *arg);
+
+void hackOne(const Il2CppAssembly** assembly_list, const char* assemblyName, const char* nameSpace, const char* className, const char* methodName, int argsCount, void* hookMethod, void** backupMethod);
+void hackOneNested(const Il2CppAssembly** assembly_list, const char* assemblyName, const char* nameSpace, const char* className, const char* nestedClassName, const char* methodName, int argsCount, void* hookMethod, void* backupMethod);
 
 #define LOG_TAG "UNITYHOOK"
 #define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)

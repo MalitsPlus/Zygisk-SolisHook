@@ -217,18 +217,21 @@ cSharpByteArray* createAesIV(void *self, cSharpByteArray *secKey, void* header, 
     if(createAesIVBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    LOGI("====== CreateAesIV ======");
+    char txt[8192];
+    memset(txt, 0x00, 8192);
+    sprintf(txt, "%s====== CreateAesIV ======\n", txt);
 
     if (secKey) {
         char *secKeyStr = getByteString(secKey->buf, secKey->length);
-        LOGI("secKey is %s", secKeyStr);
+        sprintf(txt, "%ssecKey is %s\n", txt, secKeyStr);
     }
     // 原始调用
     cSharpByteArray* r = createAesIVBackup(self, secKey, header, method);
     if (r) {
         char *rBytes = getByteString(r->buf, r->length);
-        LOGI("result(iv) is %s", rBytes);
+        sprintf(txt, "%sresult(iv) is %s\n", txt, rBytes);
     }
+    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -240,15 +243,18 @@ cSharpByteArray* transformFinalBlock(void *self, cSharpByteArray *inputBuffer, i
     if(transformFinalBlockBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    LOGI("====== TransformFinalBlock ======");
+    char txt[8192];
+    memset(txt, 0x00, 8192);
+    sprintf(txt, "%s====== TransformFinalBlock ======\n", txt);
     if (inputBuffer) {
         char* beforeInputBuf = getByteString(inputBuffer->buf, inputBuffer->length);
-        LOGI("input buffer(header?) is %s", beforeInputBuf);
-        LOGI("inputOffset is %d", inputOffset);
-        LOGI("inputCount is %d", inputCount);
+        sprintf(txt, "%sinput buffer(header?) is %s\n", txt, beforeInputBuf);
+        sprintf(txt, "%sinputOffset is %d\n", txt, inputOffset);
+        sprintf(txt, "%sinputCount is %d\n", txt, inputCount);
     }
     // 原始调用
     cSharpByteArray* r = transformFinalBlockBackup(self, inputBuffer, inputOffset, inputCount, method);
+    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -260,13 +266,16 @@ cSharpByteArray* getHash(void *self, const MethodInfo *method){
     if(getHashBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    LOGI("====== GetHash ======");
+    char txt[8192];
+    memset(txt, 0x00, 8192);
+    sprintf(txt, "%s====== GetHash ======\n", txt);
     // 原始调用
     cSharpByteArray* r = getHashBackup(self, method);
     if (r) {
         char *rStr = getByteString(r->buf, r->length);
-        LOGI("hash(iv?) is %s", rStr);
+        sprintf(txt, "%shash(iv?) is %s\n", txt, rStr);
     }
+    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 
@@ -297,29 +306,34 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
     if(decryptBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
-    LOGI("====== Decrypt ======");
+
+    char txt[8192];
+    memset(txt, 0x00, 8192);
+    sprintf(txt, "%s====== Decrypt ======\n", txt);
     if (bytes) {
         char *bytesStr = getByteString(bytes->buf, bytes->length);
-        LOGI("original bytes is %s", bytesStr);
-        LOGI("original bytes length is %d", (int)bytes->length);
+        sprintf(txt, "%soriginal bytes is %s\n", txt, bytesStr);
+        sprintf(txt, "%soriginal bytes length is %d\n", txt, (int)bytes->length);
     }
     if (key) {
         char *keyStr = getByteString(key->buf, key->length);
-        LOGI("key is %s", keyStr);
+        sprintf(txt, "%skey is %s\n", txt, keyStr);
     }
     if (iv) {
         char *ivStr = getByteString(iv->buf, iv->length);
-        LOGI("iv is %s", ivStr);
+        sprintf(txt, "%siv is %s\n", txt, ivStr);
     }
-    LOGI("offset(header length) is %d", offset);
-    LOGI("message length is %d", length);
+    sprintf(txt, "%soffset(header length) is %d\n", txt, offset);
+    sprintf(txt, "%smessage length is %d\n", txt, length);
 
     // 原始调用
     cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
     if (r) {
         char *rStr = getByteString(r->buf, r->length);
-        LOGI("result is %s", rStr);
+        sprintf(txt, "%sresult is %s\n", txt, rStr);
     }
+
+    write2File("solis_decrypt.txt", txt, "a+");
     return r;
 }
 

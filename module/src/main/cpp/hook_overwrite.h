@@ -1,0 +1,6 @@
+#ifndef RIRU_SOLISHOOK_HOOK_OVERWRITE_H
+#define RIRU_SOLISHOOK_HOOK_OVERWRITE_H
+
+void hackMain(const Il2CppAssembly**);
+
+#endif //RIRU_SOLISHOOK_HOOK_OVERWRITE_H

@@ -22,6 +22,21 @@
 #include "il2cpp.h"
 #include <iomanip>
 #include <sys/system_properties.h>
+#include "utils.h"
+#include "hook_overwrite.h"
+
+typedef void* (*dlopen_type)(const char* name, int flags, const void* caller_addr);
+dlopen_type dlopen_backup = nullptr;
+
+il2cpp_domain_get_ il2cpp_domain_get;
+il2cpp_domain_get_assemblies_ il2cpp_domain_get_assemblies;
+il2cpp_assembly_get_image_ il2cpp_assembly_get_image;
+il2cpp_class_from_name_ il2cpp_class_from_name;
+il2cpp_class_get_method_from_name_ il2cpp_class_get_method_from_name;
+il2cpp_image_get_class_count_ il2cpp_image_get_class_count;
+il2cpp_image_get_class_ il2cpp_image_get_class;
+il2cpp_class_get_methods_ il2cpp_class_get_methods;
+il2cpp_class_get_nested_types_ il2cpp_class_get_nested_types;
 
 /// 判断当前的进程路径是否是目标游戏
 int isGame(JNIEnv *env, jstring appDataDir) {
@@ -84,113 +99,6 @@ unsigned long get_module_base(const char* module_name)
     return addr;
 }
 
-struct cSharpByteArray {
-    size_t idkwhatisthis[3];
-    size_t length;
-    uint8_t buf[4096];
-};
-
-struct cSharpString {
-    size_t address; // size_t 在 arm64 中占8字节
-    size_t nothing; // 不知为何，在android中看内存有这段，而在pc中查看内存时无这段
-    int length;
-    char buf[4096];
-};
-
-char* getString(char* buf, int length) {
-    // 由于 c++ 必须在字符串最后添加\0，故需要+1
-    char* str = (char*)malloc(length + 1);
-    memset(str, 0x00, length + 1);
-    // 每个字符占2字节
-    for (int i = 0; i < length; i++) {
-        strcpy(str + i, buf + i * 2);
-    }
-    return str;
-}
-
-char* getCsharpString(cSharpString* sharpString) {
-    return getString(sharpString->buf, sharpString->length);
-}
-
-/// 以指定模式写文件
-/// a+ or w+
-void write2File(const char* filename, char* buf, const char* mode) {
-    FILE *fp = nullptr;
-    char path[256];
-    memset(path, 0x00, 256);
-    sprintf(path, "/sdcard/Download/%s", filename);
-
-
-    fp = fopen(path, mode);
-
-    if (fp) {
-        LOGI("File opened: %s", path);
-        // 在buf结尾处添加\n
-        size_t length = strlen(buf);
-        char buf2[length + 1];
-        memset(buf2, 0x00, length + 1);
-        sprintf(buf2, "%s\n", buf);
-        LOGI("buf is %s", buf2);
-        fputs(buf2, fp);
-        fclose(fp);
-        LOGI("Write file completed.");
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
-    }
-}
-
-/// 读取文本文件到字符串
-char* readFromFile(const char* path) {
-    FILE *fp = nullptr;
-    fp = fopen(path, "r");
-    char* buf;
-
-    if (fp) {
-        LOGI("Open file fp at %lx", (long)fp);
-        fseek(fp, 0, SEEK_END);
-        long size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-
-        LOGI("File size is %ld", size);
-
-        buf = (char*)malloc(size);
-        memset(buf, 0x00, size);
-
-        char c;
-        int i = 0;
-        while (1) {
-            c = fgetc(fp);
-            if (feof(fp)) {
-                break;
-            }
-            *(buf + i++) = c;
-        }
-        fclose(fp);
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
-    }
-    LOGI("Read file completed.");
-    return buf;
-}
-
-char* getByteString(uint8_t* buf, size_t length) {
-    char* str = (char*)malloc(length * 2 + 1);
-    memset(str, 0x00, length * 2 + 1);
-    unsigned short tmp[4096];
-    for (int i = 0; i < length; i++) {
-        tmp[i] = buf[i];
-    }
-    for (int i = 0; i < length; i++) {
-        sprintf(str + i * 2, "%02hx", tmp[i]);
-    }
-    return str;
-}
-
-typedef void* (*dlopen_type)(const char* name,
-                             int flags,
-        //const void* extinfo,
-                             const void* caller_addr);
-dlopen_type dlopen_backup = nullptr;
 /// 被替换的 dlopen 函数，这里只用于寻找 "libil2cpp.so" 的句柄
 void* dlopen_(const char* name,
               int flags,
@@ -208,135 +116,6 @@ void* dlopen_(const char* name,
     }
     return handle;
 }
-
-// FIXME: ReturnType Argsm
-typedef cSharpByteArray* (*CreateAesIV)(void *self, cSharpByteArray *secKey, void* header, const MethodInfo *method);
-CreateAesIV createAesIVBackup = nullptr;
-// FIXME: ReturnType Args
-cSharpByteArray* createAesIV(void *self, cSharpByteArray *secKey, void* header, const MethodInfo *method){
-    if(createAesIVBackup == nullptr){
-        LOGE("backup DOES NOT EXIST");
-    }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== CreateAesIV ======\n", txt);
-
-    if (secKey) {
-        char *secKeyStr = getByteString(secKey->buf, secKey->length);
-        sprintf(txt, "%ssecKey is %s\n", txt, secKeyStr);
-    }
-    // 原始调用
-    cSharpByteArray* r = createAesIVBackup(self, secKey, header, method);
-    if (r) {
-        char *rBytes = getByteString(r->buf, r->length);
-        sprintf(txt, "%sresult(iv) is %s\n", txt, rBytes);
-    }
-    write2File("solis_decrypt.txt", txt, "a+");
-    return r;
-}
-
-// FIXME: ReturnType Argsm
-typedef cSharpByteArray* (*TransformFinalBlock)(void *self, cSharpByteArray *inputBuffer, int32_t inputOffset, int32_t inputCount, const MethodInfo *method);
-TransformFinalBlock transformFinalBlockBackup = nullptr;
-// FIXME: ReturnType Args
-cSharpByteArray* transformFinalBlock(void *self, cSharpByteArray *inputBuffer, int32_t inputOffset, int32_t inputCount, const MethodInfo *method){
-    if(transformFinalBlockBackup == nullptr){
-        LOGE("backup DOES NOT EXIST");
-    }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== TransformFinalBlock ======\n", txt);
-    if (inputBuffer) {
-        char* beforeInputBuf = getByteString(inputBuffer->buf, inputBuffer->length);
-        sprintf(txt, "%sinput buffer(header?) is %s\n", txt, beforeInputBuf);
-        sprintf(txt, "%sinputOffset is %d\n", txt, inputOffset);
-        sprintf(txt, "%sinputCount is %d\n", txt, inputCount);
-    }
-    // 原始调用
-    cSharpByteArray* r = transformFinalBlockBackup(self, inputBuffer, inputOffset, inputCount, method);
-    write2File("solis_decrypt.txt", txt, "a+");
-    return r;
-}
-
-// FIXME: ReturnType Argsm
-typedef cSharpByteArray* (*GetHash)(void *self, const MethodInfo *method);
-GetHash getHashBackup = nullptr;
-// FIXME: ReturnType Args
-cSharpByteArray* getHash(void *self, const MethodInfo *method){
-    if(getHashBackup == nullptr){
-        LOGE("backup DOES NOT EXIST");
-    }
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== GetHash ======\n", txt);
-    // 原始调用
-    cSharpByteArray* r = getHashBackup(self, method);
-    if (r) {
-        char *rStr = getByteString(r->buf, r->length);
-        sprintf(txt, "%shash(iv?) is %s\n", txt, rStr);
-    }
-    write2File("solis_decrypt.txt", txt, "a+");
-    return r;
-}
-
-// FIXME: ReturnType Argsm
-typedef bool (*GetIsCompress)(void *self, const MethodInfo *method);
-GetIsCompress getIsCompressBackup = nullptr;
-// FIXME: ReturnType Args
-bool getIsCompress(void *self, const MethodInfo *method){
-    if(getIsCompressBackup == nullptr){
-        LOGE("backup DOES NOT EXIST");
-    }
-    LOGI("====== GetIsCompress ======");
-    if (self) {
-        LOGI("self(header) class at %lx", (long)self);
-    }
-    // 原始调用
-    bool r = getIsCompressBackup(self, method);
-    LOGI("result is %d", r);
-
-    return r;
-}
-
-// FIXME: ReturnType Argsm
-typedef cSharpByteArray* (*Decrypt)(void* self, cSharpByteArray* bytes, int32_t offset, int32_t length, cSharpByteArray* key, cSharpByteArray* iv, const MethodInfo *method);
-Decrypt decryptBackup = nullptr;
-// FIXME: ReturnType Args
-cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int32_t length, cSharpByteArray* key, cSharpByteArray* iv, const MethodInfo *method){
-    if(getHashBackup == nullptr){
-        LOGE("backup DOES NOT EXIST");
-    }
-
-    char txt[1048575];
-    memset(txt, 0x00, 1048575);
-    sprintf(txt, "%s====== Decrypt ======\n", txt);
-    if (bytes) {
-        char *bytesStr = getByteString(bytes->buf, bytes->length);
-        sprintf(txt, "%soriginal bytes is %s\n", txt, bytesStr);
-        sprintf(txt, "%soriginal bytes length is %d\n", txt, (int)bytes->length);
-    }
-    if (key) {
-        char *keyStr = getByteString(key->buf, key->length);
-        sprintf(txt, "%skey is %s\n", txt, keyStr);
-    }
-    if (iv) {
-        char *ivStr = getByteString(iv->buf, iv->length);
-        sprintf(txt, "%siv is %s\n", txt, ivStr);
-    }
-    sprintf(txt, "%soffset(header length) is %d\n", txt, offset);
-    sprintf(txt, "%smessage length is %d\n", txt, length);
-
-    // 原始调用
-    cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
-    if (r) {
-        char *rStr = getByteString(r->buf, r->length);
-        sprintf(txt, "%sresult is %s\n", txt, rStr);
-    }
-
-    write2File("solis_decrypt.txt", txt, "a+");
-    return r;
-}
-
 
 void hook_each(unsigned long rel_addr, void* hook, void** backup_){
     LOGI("hook_each: Installing hook at %lx", rel_addr);
@@ -358,16 +137,6 @@ void hook_each(unsigned long rel_addr, void* hook, void** backup_){
     // hook 完成后将内存属性修改回只读
     mprotect(page_start, PAGE_SIZE, PROT_READ | PROT_EXEC);
 }
-
-il2cpp_domain_get_ il2cpp_domain_get;
-il2cpp_domain_get_assemblies_ il2cpp_domain_get_assemblies;
-il2cpp_assembly_get_image_ il2cpp_assembly_get_image;
-il2cpp_class_from_name_ il2cpp_class_from_name;
-il2cpp_class_get_method_from_name_ il2cpp_class_get_method_from_name;
-il2cpp_image_get_class_count_ il2cpp_image_get_class_count;
-il2cpp_image_get_class_ il2cpp_image_get_class;
-il2cpp_class_get_methods_ il2cpp_class_get_methods;
-il2cpp_class_get_nested_types_ il2cpp_class_get_nested_types;
 
 void hackOne(const Il2CppAssembly** assembly_list, const char* assemblyName, const char* nameSpace, const char* className, const char* methodName, int argsCount, void* hookMethod, void** backupMethod) {
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
@@ -515,53 +284,7 @@ void *hack_thread(void *arg)
     // 获取当前 domain 中的所有 assembly
     const Il2CppAssembly** assembly_list = il2cpp_domain_get_assemblies(domain, &ass_len);
 
-    hackOne(assembly_list,
-            "mscorlib",
-            "System.Security.Cryptography",
-            "HashAlgorithm",
-            "TransformFinalBlock",
-            -1,
-            (void*)transformFinalBlock,
-            (void**)&transformFinalBlockBackup);
+    hackMain(assembly_list);
 
-    hackOne(assembly_list,
-            "mscorlib",
-            "System.Security.Cryptography",
-            "HashAlgorithm",
-            "get_Hash",
-            -1,
-            (void*)getHash,
-            (void**)&getHashBackup);
-
-    hackOne(assembly_list,
-            "quaunity-api.Runtime",
-            "Qua.Network",
-            "DefaultMarshallerFactory",
-            "CreateAesIV",
-            -1,
-            (void*)createAesIV,
-            (void**)&createAesIVBackup);
-
-    hackOne(assembly_list,
-            "quaunity-api.Runtime",
-            "Qua.Network",
-            "DefaultMarshallerFactory",
-            "Decrypt",
-            -1,
-            (void*)decrypt,
-            (void**)&decryptBackup);
-
-//    hackOneNested(assembly_list,
-//            "quaunity-api.Runtime",
-//            "Qua.Network",
-//            "DefaultMarshallerFactory",
-//            "Header",
-//            "get_IsCompress",
-//            -1,
-//            (void*)getIsCompress,
-//            (void**)&getIsCompressBackup);
     return nullptr;
 }
-
-
-

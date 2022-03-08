@@ -39,7 +39,7 @@ include_directories(
         ${DobbyHome}/external/logging
 )
 
-add_library(${MODULE_NAME} SHARED main.cpp ${CMAKE_CURRENT_BINARY_DIR}/config.cpp hook_main.cpp)
+add_library(${MODULE_NAME} SHARED main.cpp ${CMAKE_CURRENT_BINARY_DIR}/config.cpp hook_main.cpp hook_overwrite.cpp utils.cpp)
 macro(SET_OPTION option value)
     set(${option} ${value} CACHE INTERNAL "" FORCE)
 endmacro()
