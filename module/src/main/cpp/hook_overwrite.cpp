@@ -27,8 +27,11 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
         LOGI("key is %s", keyStr);
     }
 
-    writeByte2File("dec_keys.bin", bytes->buf, bytes->length);
-
+    if (bytes->buf[1] | bytes->buf[2]) {
+        std::string filename = "iprhook/" + currentDateTime() + ".bin";
+        writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+    }
+    LOGI("bytes length is %d", (int)bytes->length);
     if (iv) {
         char *ivStr = getByteString(iv->buf, iv->length);
         LOGI("iv is %s", ivStr);

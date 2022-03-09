@@ -11,6 +11,9 @@
 #include "hook_main.h"
 #include <iostream>
 #include <fstream>
+#include <chrono>
+#include <sstream>
+#include <iomanip>
 
 using namespace std;
 
@@ -20,47 +23,35 @@ string getCsString(cSharpString* csString) {
     return result;
 }
 
-/// 将 char* 转为可以直接使用的 char*
-char* getString(char* buf, int length) {
-    // 由于 c++ 必须在字符串最后添加\0，故需要+1
-    char* str = (char*)malloc(length + 1);
-    memset(str, 0x00, length + 1);
-    // 每个字符占2字节
+string getCsByteString(cSharpByteArray* csBytes) {
+    getByteString(csBytes->buf, csBytes->length);
+}
+
+string getByteString(uint8_t* buf, int length) {
+    stringstream ss;
+    ss << hex;
     for (int i = 0; i < length; i++) {
-        strcpy(str + i, buf + i * 2);
+        ss << setw(2) << setfill('0') << buf + i;
     }
-    return str;
+    return ss.str();
 }
 
-/// 获取结构体 cSharpString 中的 char*
-char* getCsharpString(cSharpString* sharpString) {
-    return getString(sharpString->buf, sharpString->length);
-}
+string currentDateTime() {
+    using chrono::system_clock;
 
-/// 以指定模式写文件
-/// a+ or w+
-void write2File(const char* filename, char* buf, const char* mode) {
-    FILE *fp = nullptr;
-    char path[256];
-    memset(path, 0x00, 256);
-    sprintf(path, "/sdcard/Download/%s", filename);
+    system_clock::time_point now = system_clock::now();
+    chrono::milliseconds ms = chrono::duration_cast<chrono::milliseconds>(
+            now.time_since_epoch()
+    );
+    int ms_t = ms.count() % 1000;
 
-    fp = fopen(path, mode);
-
-    if (fp) {
-        LOGI("File opened: %s", path);
-        // 在buf结尾处添加\n
-        size_t length = strlen(buf);
-        char buf2[length + 1];
-        memset(buf2, 0x00, length + 1);
-        sprintf(buf2, "%s\n", buf);
-        LOGI("buf is %s", buf2);
-        fputs(buf2, fp);
-        fclose(fp);
-        LOGI("Write file completed.");
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
-    }
+    time_t now_t = system_clock::to_time_t(now);
+    struct tm tstruct {};
+    char buf[16];
+    tstruct = *localtime(&now_t);
+    strftime(buf, sizeof(buf), "%y%m%d%H%M%S", &tstruct);
+    sprintf(buf, "%s%d", buf, ms_t);
+    return buf;
 }
 
 int writeByte2File(const char* filename, uint8_t* buf, size_t length) {
@@ -78,10 +69,11 @@ int writeByte2File(const char* filename, uint8_t* buf, size_t length) {
     return 0;
 }
 
-int writeText2File(const char* filename, const char* buf, size_t length) {
+/// openmode = 0: overwrite; openmode = ios::app: append
+int writeText2File(const char* filename, const char* buf, size_t length, const ios::openmode mode) {
     string path = "/sdcard/Download/";
     path.append(filename);
-    fstream file(path, ios::out);
+    fstream file(path, ios::out | mode);
     if (!file) {
         LOGE("Error opening file %s", path.c_str());
         return -1;
@@ -91,50 +83,16 @@ int writeText2File(const char* filename, const char* buf, size_t length) {
     return 0;
 }
 
-/// 读取文本文件到字符串
-char* readFromFile(const char* path) {
-    FILE *fp = nullptr;
-    fp = fopen(path, "r");
-    char* buf;
-
-    if (fp) {
-        LOGI("Open file fp at %lx", (long)fp);
-        fseek(fp, 0, SEEK_END);
-        long size = ftell(fp);
-        fseek(fp, 0, SEEK_SET);
-
-        LOGI("File size is %ld", size);
-
-        buf = (char*)malloc(size);
-        memset(buf, 0x00, size);
-
-        char c;
-        int i = 0;
-        while (1) {
-            c = fgetc(fp);
-            if (feof(fp)) {
-                break;
-            }
-            *(buf + i++) = c;
-        }
-        fclose(fp);
-    } else {
-        LOGE("Error: [%d] %s", errno, strerror(errno));
+string readTextFile(const char* filename, int length) {
+    string path = "/sdcard/Download/";
+    path.append(filename);
+    fstream file(path, ios::in);
+    if (!file) {
+        LOGE("Error opening file %s", path.c_str());
+        return "";
     }
-    LOGI("Read file completed.");
-    return buf;
-}
-
-/// 将byte转为char*
-char* getByteString(uint8_t* buf, size_t length) {
-    char* str = (char*)malloc(length * 2 + 1);
-    memset(str, 0x00, length * 2 + 1);
-    unsigned short tmp[4096];
-    for (int i = 0; i < length; i++) {
-        tmp[i] = buf[i];
-    }
-    for (int i = 0; i < length; i++) {
-        sprintf(str + i * 2, "%02hx", tmp[i]);
-    }
-    return str;
+    string result;
+    file >> result;
+    file.close();
+    return result;
 }

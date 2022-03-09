@@ -21,5 +21,8 @@ char* readFromFile(const char* path);
 char* getByteString(uint8_t* buf, size_t length);
 int writeByte2File(const char* filename, uint8_t* buf, size_t length);
 char* readFromFile(const char* path);
+std::string currentDateTime();
+std::string getCsByteString(cSharpByteArray* csBytes);
+std::string getByteString(uint8_t* buf, int length);
 
 #endif //RIRU_SOLISHOOK_UTILS_H
