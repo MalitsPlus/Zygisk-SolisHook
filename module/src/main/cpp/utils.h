@@ -4,14 +4,14 @@
 struct cSharpByteArray {
     size_t idkwhatisthis[3];
     size_t length;
-    uint8_t buf[4096];
+    uint8_t buf[0];
 };
 
 struct cSharpString {
     size_t address; // size_t 在 arm64 中占8字节
     size_t nothing; // 不知为何，在android中看内存有这段，而在pc中查看内存时无这段
     int length;
-    char buf[4096];
+    char buf[0];
 };
 
 char* getString(char* buf, int length);
@@ -23,6 +23,6 @@ int writeByte2File(const char* filename, uint8_t* buf, size_t length);
 char* readFromFile(const char* path);
 std::string currentDateTime();
 std::string getCsByteString(cSharpByteArray* csBytes);
-std::string getByteString(uint8_t* buf, int length);
+std::string getByteString(const uint8_t* buf, int length);
 
 #endif //RIRU_SOLISHOOK_UTILS_H

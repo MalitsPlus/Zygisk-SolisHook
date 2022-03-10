@@ -23,17 +23,17 @@ string getCsString(cSharpString* csString) {
     return result;
 }
 
-string getCsByteString(cSharpByteArray* csBytes) {
-    getByteString(csBytes->buf, csBytes->length);
-}
-
 string getByteString(uint8_t* buf, int length) {
     stringstream ss;
-    ss << hex;
+    ss << hex << setfill('0');
     for (int i = 0; i < length; i++) {
-        ss << setw(2) << setfill('0') << buf + i;
+        ss << setw(2)  << (int)*(buf + i);
     }
     return ss.str();
+}
+
+string getCsByteString(cSharpByteArray* csBytes) {
+    return getByteString(csBytes->buf, (int)csBytes->length);
 }
 
 string currentDateTime() {
