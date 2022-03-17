@@ -30,14 +30,23 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
         string keyStr = getCsByteString(key);
         LOGI("key is %s", keyStr.c_str());
     }
-
-    if (flag == 1) {
-        string filename = "iprhook/queststart" + currentDateTime() + ".bin";
-        writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+    switch (flag) {
+        case 1: {
+            string filename = "iprhook/queststart" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            break;
+        }
+        case 2: {
+            string filename = "iprhook/userClientGetAsync" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            break;
+        }
+        default: break;
     }
-    flag = 0;
 
-    LOGI("bytes length is %d", (int)bytes->length);
+    if (bytes) {
+        LOGI("bytes length is %d", (int)bytes->length);
+    }
 
     if (iv) {
         string ivStr = getCsByteString(iv);
@@ -49,6 +58,12 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
 
     // 原始调用
     cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
+    if (flag == 2) {
+        string filename = "iprhook/userClientGetAsyncDec" + currentDateTime() + ".bin";
+        writeByte2File(filename.c_str(), r->buf, r->length);
+    }
+
+    flag = 0;
     return r;
 }
 
@@ -64,22 +79,48 @@ void questStartRequest(void* self, void* method) {
     questStartRequestBackup(self, method);
 }
 
-void hackMain(const Il2CppAssembly** assembly_list) {
+void* (*userClientGetAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* userClientGetAsync(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(userClientGetAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling userClientGetAsync");
+    if (flag == 0) {
+        flag = 2;
+    }
+    void* r = userClientGetAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
+void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
     hackOne(assembly_list,
+            size,
             "quaunity-api.Runtime",
             "Qua.Network",
             "DefaultMarshallerFactory",
             "Decrypt",
             -1,
-            (void*)decrypt,
-            (void**)&decryptBackup);
+            (void *) decrypt,
+            (void **) &decryptBackup);
 
     hackOne(assembly_list,
+            size,
             "Assembly-CSharp",
             "Solis.Common.Proto.Api",
             "QuestStartRequest",
             ".ctor",
             -1,
-            (void*)questStartRequest,
-            (void**)&questStartRequestBackup);
+            (void *) questStartRequest,
+            (void **) &questStartRequestBackup);
+
+//    hackOneNested(assembly_list,
+//                  size,
+//                  "Assembly-CSharp",
+//                  "Solis.Common.Proto.Api",
+//                  "User",
+//                  "UserClient",
+//                  "GetAsync",
+//                  4,
+//                  (void *) userClientGetAsync,
+//                  (void **) &userClientGetAsyncBackup);
 }
