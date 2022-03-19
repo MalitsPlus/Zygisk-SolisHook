@@ -155,19 +155,29 @@ Il2CppClass* printAndGetClass(const Il2CppImage* image, const char* className) {
 
 void hackOne(const Il2CppAssembly** assembly_list, unsigned long size, const char* assemblyName, const char* nameSpace, const char* className, const char* methodName, int argsCount, void* hookMethod, void** backupMethod) {
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
+    LOGI("== start hacking %s.%s ==", className, methodName);
     LOGI("%ld assemblies here", size);
-    unsigned long i = 0;
-    while(strcmp((*assembly_list)->aname.name, assemblyName) != 0){
-//        LOGD("Assembly name: %s, count %ld", (*assembly_list)->aname.name, ++i);
-        assembly_list++;
-        if (i >= size) {
-            LOGE("Cannot find assembly %s, end hacking", assemblyName);
+    int i = 0;
+    for (; i < size; i++) {
+        if (*(assembly_list + i) != nullptr) {
+            if (strcmp((*(assembly_list + i))->aname.name, assemblyName) != 0) {
+                // LOGD("Assembly name: %s, count %ld", (*assembly_list)->aname.name, ++i);
+                if (i == size - 1) {
+                    LOGE("Cannot find assembly %s, end hacking", assemblyName);
+                    return;
+                }
+            } else {
+                LOGW("Assembly name: %s", (*(assembly_list + i))->aname.name);
+                break;
+            }
+        } else {
+            LOGE("assembly_list is null, stop hacking");
             return;
         }
     }
-    LOGW("Assembly name: %s", (*assembly_list)->aname.name);
+
     // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
-    const Il2CppImage* image = il2cpp_assembly_get_image(*assembly_list);
+    const Il2CppImage* image = il2cpp_assembly_get_image(*(assembly_list + i));
     LOGI("image got at %lx", (long)image);
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
@@ -184,7 +194,7 @@ void hackOne(const Il2CppAssembly** assembly_list, unsigned long size, const cha
     LOGI("method got at %lx", addr);
     LOGI("start hook target method...");
     hook_each(addr, hookMethod, backupMethod);
-    LOGD("hack %s finished", methodName);
+    LOGD("== hack %s.%s finished ==", className, methodName);
 }
 
 void hackOneNested(const Il2CppAssembly** assembly_list, unsigned long size, const char* assemblyName, const char* nameSpace, const char* className, const char* nestedClassName, const char* methodName, int argsCount, void* hookMethod, void** backupMethod) {

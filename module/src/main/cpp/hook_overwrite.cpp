@@ -26,10 +26,10 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("====== Decrypt ======");
-    if (key) {
-        string keyStr = getCsByteString(key);
-        LOGI("key is %s", keyStr.c_str());
+    if (bytes) {
+        LOGI("bytes length is %d", (int)bytes->length);
     }
+
     switch (flag) {
         case 1: {
             string filename = "iprhook/queststart" + currentDateTime() + ".bin";
@@ -41,28 +41,21 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
             break;
         }
+        case 3: {
+            string filename = "iprhook/tourLive" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            break;
+        }
+        case 4: {
+            string filename = "iprhook/pvp" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            break;
+        }
         default: break;
     }
 
-    if (bytes) {
-        LOGI("bytes length is %d", (int)bytes->length);
-    }
-
-    if (iv) {
-        string ivStr = getCsByteString(iv);
-        LOGI("iv is %s", ivStr.c_str());
-    }
-
-    LOGI("offset(header length) is %d", offset);
-    LOGI("message length is %d", length);
-
     // 原始调用
     cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
-    if (flag == 2) {
-        string filename = "iprhook/userClientGetAsyncDec" + currentDateTime() + ".bin";
-        writeByte2File(filename.c_str(), r->buf, r->length);
-    }
-
     flag = 0;
     return r;
 }
@@ -77,6 +70,30 @@ void questStartRequest(void* self, void* method) {
         flag = 1;
     }
     questStartRequestBackup(self, method);
+}
+
+void (*tourAreaLiveRequestBackup) (void* self, void* method) = nullptr;
+void tourAreaLiveRequest(void* self, void* method) {
+    if(questStartRequestBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling tourAreaLiveRequest");
+    if (flag == 0) {
+        flag = 3;
+    }
+    tourAreaLiveRequestBackup(self, method);
+}
+
+void (*pvpStartRequestBackup) (void* self, void* method) = nullptr;
+void pvpStartRequest(void* self, void* method) {
+    if(questStartRequestBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling pvpStartRequest");
+    if (flag == 0) {
+        flag = 4;
+    }
+    pvpStartRequestBackup(self, method);
 }
 
 void* (*userClientGetAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
@@ -112,6 +129,26 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             -1,
             (void *) questStartRequest,
             (void **) &questStartRequestBackup);
+
+    hackOne(assembly_list,
+            size,
+            "Assembly-CSharp",
+            "Solis.Common.Proto.Api",
+            "TourAreaLiveRequest",
+            ".ctor",
+            -1,
+            (void *) tourAreaLiveRequest,
+            (void **) &tourAreaLiveRequestBackup);
+
+    hackOne(assembly_list,
+            size,
+            "Assembly-CSharp",
+            "Solis.Common.Proto.Api",
+            "PvpStartRequest",
+            ".ctor",
+            -1,
+            (void *) pvpStartRequest,
+            (void **) &pvpStartRequestBackup);
 
 //    hackOneNested(assembly_list,
 //                  size,
