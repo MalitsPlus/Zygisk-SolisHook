@@ -60,6 +60,30 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
     return r;
 }
 
+cSharpByteArray* (*encryptBackup) (void* self, cSharpByteArray* bytes, cSharpByteArray* key, cSharpByteArray* iv, const MethodInfo *method) = nullptr;
+cSharpByteArray* encrypt(void* self, cSharpByteArray* bytes, cSharpByteArray* key, cSharpByteArray* iv, const MethodInfo *method){
+    if(encryptBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("====== Encrypt ======");
+    if (bytes) {
+        LOGI("bytes length is %d", (int)bytes->length);
+    }
+
+    switch (flag) {
+        case 5: {
+            string filename = "iprhook/plain_saveDeck" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            break;
+        }
+        default: break;
+    }
+    // 原始调用
+    cSharpByteArray* r = encryptBackup(self, bytes, key, iv, method);
+    flag = 0;
+    return r;
+}
+
 void (*questStartRequestBackup) (void* self, void* method) = nullptr;
 void questStartRequest(void* self, void* method) {
     if(questStartRequestBackup == nullptr){
@@ -109,6 +133,19 @@ void* userClientGetAsync(void* self, void* request, void* headers, void* deadlin
     return r;
 }
 
+void* (*deckClientSaveAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* deckClientSaveAsync(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(deckClientSaveAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling deckClientSaveAsync");
+    if (flag == 0) {
+        flag = 5;
+    }
+    void* r = deckClientSaveAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
     hackOne(assembly_list,
             size,
@@ -119,6 +156,16 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             -1,
             (void *) decrypt,
             (void **) &decryptBackup);
+
+    hackOne(assembly_list,
+            size,
+            "quaunity-api.Runtime",
+            "Qua.Network",
+            "DefaultMarshallerFactory",
+            "Encrypt",
+            -1,
+            (void *) encrypt,
+            (void **) &encryptBackup);
 
     hackOne(assembly_list,
             size,
@@ -150,14 +197,25 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             (void *) pvpStartRequest,
             (void **) &pvpStartRequestBackup);
 
-//    hackOneNested(assembly_list,
-//                  size,
-//                  "Assembly-CSharp",
-//                  "Solis.Common.Proto.Api",
-//                  "User",
-//                  "UserClient",
-//                  "GetAsync",
-//                  4,
-//                  (void *) userClientGetAsync,
-//                  (void **) &userClientGetAsyncBackup);
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "User",
+                  "UserClient",
+                  "GetAsync",
+                  4,
+                  (void *) userClientGetAsync,
+                  (void **) &userClientGetAsyncBackup);
+
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "Deck",
+                  "DeckClient",
+                  "SaveAsync",
+                  4,
+                  (void *) deckClientSaveAsync,
+                  (void **) &deckClientSaveAsyncBackup);
 }

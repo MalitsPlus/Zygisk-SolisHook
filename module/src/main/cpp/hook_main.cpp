@@ -198,75 +198,83 @@ void hackOne(const Il2CppAssembly** assembly_list, unsigned long size, const cha
 }
 
 void hackOneNested(const Il2CppAssembly** assembly_list, unsigned long size, const char* assemblyName, const char* nameSpace, const char* className, const char* nestedClassName, const char* methodName, int argsCount, void* hookMethod, void** backupMethod) {
-    const Il2CppImage *image;
-    unsigned long i = 0;
     // 循环遍历当前 domain 中的 assembly_list，直到找到 Assembly-CSharp
+    LOGI("== start hacking %s.%s ==", className, methodName);
     LOGI("%ld assemblies here", size);
-    while (strcmp((*assembly_list)->aname.name, assemblyName) != 0) {
-        LOGD("Assembly name: %s, count %ld", (*assembly_list)->aname.name, ++i);
-        assembly_list++;
-        if (i >= size) {
-            LOGE("Cannot find assembly %s, end hacking", assemblyName);
+    int i = 0;
+    for (; i < size; i++) {
+        if (*(assembly_list + i) != nullptr) {
+            if (strcmp((*(assembly_list + i))->aname.name, assemblyName) != 0) {
+                // LOGD("Assembly name: %s, count %ld", (*assembly_list)->aname.name, ++i);
+                if (i == size - 1) {
+                    LOGE("Cannot find assembly %s, end hacking", assemblyName);
+                    return;
+                }
+            } else {
+                LOGW("Assembly name: %s", (*(assembly_list + i))->aname.name);
+                break;
+            }
+        } else {
+            LOGE("assembly_list is null, stop hacking");
             return;
         }
     }
-    LOGW("Assembly name: %s", (*assembly_list)->aname.name);
+
     // 获取当前 Assembly（此时为"Assembly-CSharp"）中的 image
-    image = il2cpp_assembly_get_image(*assembly_list);
-    LOGI("image got at %lx", (long) image);
-
-    // 打印该 assembly 下所有类名
-//    Il2CppClass* clazz = printAndGetClass(image, nestedClassName);
-
+    const Il2CppImage* image = il2cpp_assembly_get_image(*(assembly_list + i));
+    LOGI("image got at %lx", (long)image);
     // 根据 Namespace, Classname 获取 Class
     // FIXME: NameSpace ClassName
     Il2CppClass* clazz = il2cpp_class_from_name(image, nameSpace, className);
     LOGI("clazz got at %lx", (long)clazz);
-    LOGI("clazz name is %s", clazz->name);
 
-    Il2CppClass* clas = clazz;
-    // FIXME: is nested class
+    Il2CppClass* final_clazz = nullptr;
     // 注意：clazz->nested_type_count 可能不是count，需要验证结构体正确性
     uint16_t nested_type_count = clazz->nested_type_count;
     LOGI("nested_type_count %d", nested_type_count);
     if (nested_type_count) {
-        void** iter = (void**)malloc(size * sizeof(size_t));
-        LOGD("**iter at %ld", long(iter));
-        LOGD("*iter at %ld", long(*iter));
-        // 注意这里取的是第一个嵌套类，如果有多个嵌套类需要进一步处理
-        clas = il2cpp_class_get_nested_types(clazz, iter);
+        void* iter = nullptr;
+        while (const Il2CppClass* nestedClazz = il2cpp_class_get_nested_types(clazz, &iter)) {
+            if (!strcmp(nestedClazz->name, nestedClassName)) {
+                final_clazz = (Il2CppClass*)nestedClazz;
+                break;
+            }
+        }
+//        void** iter = (void**)malloc(size * sizeof(size_t));
+//        LOGD("**iter at %ld", long(iter));
+//        LOGD("*iter at %ld", long(*iter));
+//        // 注意这里取的是第一个嵌套类，如果有多个嵌套类需要进一步处理
+//        nestedClazz = il2cpp_class_get_nested_types(clazz, iter);
     } else {
         LOGE("No nested class in %s, end hacking", className);
         return;
     }
 
-    Il2CppClass* final_clazz = clas;
-    LOGI("finalclazz got at %lx", (long)clazz);
-    LOGI("finalclazz name is %s", clazz->name);
+    if (final_clazz == nullptr) {
+        LOGE("No nested class named %s in %s", nestedClassName, className);
+        return;
+    }
+
+    LOGI("finalclazz got at %lx", (long)final_clazz);
+    LOGI("finalclazz name is %s", final_clazz->name);
 
 //    for (int i = 0; i < nested_type_count; i++) {
 //        LOGI("nestedTypes at %lx", (long)clazz->nestedTypes);
 //        Il2CppClass *c = (Il2CppClass*)clazz->nestedTypes + i;
 //        const char *nst_name = c->name;
 //        LOGI("one nested class named %s", nst_name);
-//        // FIXME: nested class name
 //        if (strcmp(nst_name, nestedClassName) == 0) {
 //            final_clazz = c;
 //            break;
 //        }
 //    }
-
-    // 获取 Class 中的指定 MethodInfo，取其中的 methodPointer 获取地址，并 hook
-    // 关于 MethodInfo 的结构，可参照 il2cpp 源码 il2cpp-class-internals.h#341
-    // 参数个数为 c# 中的个数，-1 为忽略
-    // FIXME: MethodName ArgsNum
     MethodInfo* methodInfo = (MethodInfo*)il2cpp_class_get_method_from_name(final_clazz, methodName, argsCount);
     LOGI("methodInfo got at %lx", (long)methodInfo);
     unsigned long addr = (unsigned long)methodInfo->methodPointer;
     LOGI("method got at %lx", addr);
     LOGI("start hook target method...");
     hook_each(addr, hookMethod, backupMethod);
-    LOGD("hack %s finished", methodName);
+    LOGD("== hack %s.%s finished ==", className, methodName);
 }
 
 /// hook 逻辑入口点
