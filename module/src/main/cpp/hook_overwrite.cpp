@@ -34,21 +34,25 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
         case 1: {
             string filename = "iprhook/queststart" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
             break;
         }
         case 2: {
             string filename = "iprhook/userClientGetAsync" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
             break;
         }
         case 3: {
             string filename = "iprhook/tourLive" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
             break;
         }
         case 4: {
             string filename = "iprhook/pvp" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
             break;
         }
         default: break;
@@ -56,7 +60,6 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
 
     // 原始调用
     cSharpByteArray* r = decryptBackup(self, bytes, offset, length, key, iv, method);
-    flag = 0;
     return r;
 }
 
@@ -74,13 +77,14 @@ cSharpByteArray* encrypt(void* self, cSharpByteArray* bytes, cSharpByteArray* ke
         case 5: {
             string filename = "iprhook/plain_saveDeck" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
             break;
         }
         default: break;
     }
     // 原始调用
     cSharpByteArray* r = encryptBackup(self, bytes, key, iv, method);
-    flag = 0;
+
     return r;
 }
 
