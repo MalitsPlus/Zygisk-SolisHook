@@ -55,6 +55,12 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             flag = 0;
             break;
         }
+        case 6: {
+            string filename = "iprhook/masterGet" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
         default: break;
     }
 
@@ -150,6 +156,19 @@ void* deckClientSaveAsync(void* self, void* request, void* headers, void* deadli
     return r;
 }
 
+void* (*masterClientGetAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* masterClientGetAsync(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(masterClientGetAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling masterClientGetAsync");
+    if (flag == 0) {
+        flag = 6;
+    }
+    void* r = masterClientGetAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
     hackOne(assembly_list,
             size,
@@ -222,4 +241,15 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
                   4,
                   (void *) deckClientSaveAsync,
                   (void **) &deckClientSaveAsyncBackup);
+
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "Master",
+                  "MasterClient",
+                  "GetAsync",
+                  4,
+                  (void *) masterClientGetAsync,
+                  (void **) &masterClientGetAsyncBackup);
 }
