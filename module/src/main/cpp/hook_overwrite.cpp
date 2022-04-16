@@ -245,8 +245,8 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             "GvgStartRequest",
             ".ctor",
             -1,
-            (void *) pvpStartRequest,
-            (void **) &pvpStartRequestBackup);
+            (void *) gvgStartRequest,
+            (void **) &gvgStartRequestBackup);
 
     hackOneNested(assembly_list,
                   size,
