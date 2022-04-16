@@ -61,6 +61,12 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             flag = 0;
             break;
         }
+        case 7: {
+            string filename = "iprhook/gvg" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
         default: break;
     }
 
@@ -108,7 +114,7 @@ void questStartRequest(void* self, void* method) {
 
 void (*tourAreaLiveRequestBackup) (void* self, void* method) = nullptr;
 void tourAreaLiveRequest(void* self, void* method) {
-    if(questStartRequestBackup == nullptr){
+    if(tourAreaLiveRequestBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("calling tourAreaLiveRequest");
@@ -120,7 +126,7 @@ void tourAreaLiveRequest(void* self, void* method) {
 
 void (*pvpStartRequestBackup) (void* self, void* method) = nullptr;
 void pvpStartRequest(void* self, void* method) {
-    if(questStartRequestBackup == nullptr){
+    if(pvpStartRequestBackup == nullptr){
         LOGE("backup DOES NOT EXIST");
     }
     LOGI("calling pvpStartRequest");
@@ -128,6 +134,18 @@ void pvpStartRequest(void* self, void* method) {
         flag = 4;
     }
     pvpStartRequestBackup(self, method);
+}
+
+void (*gvgStartRequestBackup) (void* self, void* method) = nullptr;
+void gvgStartRequest(void* self, void* method) {
+    if(gvgStartRequestBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling gvgStartRequest");
+    if (flag == 0) {
+        flag = 7;
+    }
+    gvgStartRequestBackup(self, method);
 }
 
 void* (*userClientGetAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
@@ -215,6 +233,16 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             "Assembly-CSharp",
             "Solis.Common.Proto.Api",
             "PvpStartRequest",
+            ".ctor",
+            -1,
+            (void *) pvpStartRequest,
+            (void **) &pvpStartRequestBackup);
+
+    hackOne(assembly_list,
+            size,
+            "Assembly-CSharp",
+            "Solis.Common.Proto.Api",
+            "GvgStartRequest",
             ".ctor",
             -1,
             (void *) pvpStartRequest,
