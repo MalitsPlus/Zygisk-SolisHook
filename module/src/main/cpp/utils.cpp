@@ -50,7 +50,7 @@ string currentDateTime() {
     char buf[16];
     tstruct = *localtime(&now_t);
     strftime(buf, sizeof(buf), "%y%m%d%H%M%S", &tstruct);
-    sprintf(buf, "%s%d", buf, ms_t);
+    sprintf(buf, "%s%03d", buf, ms_t);
     return buf;
 }
 

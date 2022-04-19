@@ -67,6 +67,12 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             flag = 0;
             break;
         }
+        case 101: {
+            string filename = "iprhook/noticeList" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
         default: break;
     }
 
@@ -187,6 +193,19 @@ void* masterClientGetAsync(void* self, void* request, void* headers, void* deadl
     return r;
 }
 
+void* (*noticeFetchAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* noticeFetchAsync(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(noticeFetchAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling noticeListAsync");
+    if (flag == 0) {
+        flag = 101;
+    }
+    void* r = noticeFetchAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
     hackOne(assembly_list,
             size,
@@ -280,4 +299,15 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
                   4,
                   (void *) masterClientGetAsync,
                   (void **) &masterClientGetAsyncBackup);
+
+//    hackOneNested(assembly_list,
+//                  size,
+//                  "Assembly-CSharp",
+//                  "Solis.Common.Proto.Api",
+//                  "Notice",
+//                  "NoticeClient",
+//                  "ListAsync",
+//                  4,
+//                  (void *) noticeFetchAsync,
+//                  (void **) &noticeFetchAsyncBackup);
 }
