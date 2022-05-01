@@ -78,21 +78,33 @@ int writeText2File(const char* filename, const char* buf, size_t length, const i
         LOGE("Error opening file %s", path.c_str());
         return -1;
     }
-    file << buf;
+    file.write(buf, length);
     file.close();
+    LOGI("Writes %s done", path.c_str());
     return 0;
 }
 
-string readTextFile(const char* filename, int length) {
-    string path = "/sdcard/Download/";
+string readTextFile(const char* filename) {
+//    string path = "/sdcard/Download/";
+    string path = "/data/data/game.qualiarts.idolypride/files/";
     path.append(filename);
+    LOGI("%s", path.c_str());
     fstream file(path, ios::in);
     if (!file) {
-        LOGE("Error opening file %s", path.c_str());
+        LOGE("Cannot open file %s.", path.c_str());
+        LOGE("%s", strerror(errno));
         return "";
     }
-    string result;
-    file >> result;
+    LOGI("Read %s succeed.", path.c_str());
+    stringstream buffer;
+    buffer << file.rdbuf();
     file.close();
-    return result;
+    LOGI("Read to buffer, returning to code.");
+    return buffer.str();
+}
+
+u16string wreadTextFile(const char* filename) {
+    string sstr = readTextFile(filename);
+    u16string wbuffer = u16string(sstr.begin(), sstr.end());
+    return wbuffer;
 }

@@ -206,7 +206,51 @@ void* noticeFetchAsync(void* self, void* request, void* headers, void* deadline,
     return r;
 }
 
+cSharpString* (*getSSLRootCertificatesBackup) (void* self, void* method) = nullptr;
+cSharpString* getSSLRootCertificates(void* self, void* method) {
+    if(getSSLRootCertificatesBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling getSSLRootCertificates");
+    cSharpString* origin = getSSLRootCertificatesBackup(self, method);
+
+    u16string rootspem = wreadTextFile("iprroots.pem");
+
+    if (rootspem.empty()) {
+        LOGI("Cannot read text from ipr_roots.pem, using original strings instead.");
+        return origin;
+    }
+
+    const char16_t* pem_char = rootspem.c_str();
+    size_t pem_len = rootspem.length();
+
+    auto* alter = (cSharpString*)malloc(sizeof(cSharpString) + pem_len * 2);
+    alter->address = origin->address;
+    alter->nothing = 0;
+    alter->length = pem_len;
+    LOGI("Writing buf...");
+    memcpy(alter->buf, pem_char, pem_len * 2);
+
+    LOGI("SSLRootCertificates has been replaced.");
+
+    return alter;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
+
+    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+    hackOne(assembly_list,
+            size,
+            "Assembly-CSharp",
+            "Solis.Common.Network",
+            "Api",
+            "GetSSLRootCertificates",
+            -1,
+            (void *) getSSLRootCertificates,
+            (void **) &getSSLRootCertificatesBackup);
+
     hackOne(assembly_list,
             size,
             "quaunity-api.Runtime",
@@ -277,17 +321,6 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
                   4,
                   (void *) userClientGetAsync,
                   (void **) &userClientGetAsyncBackup);
-
-    hackOneNested(assembly_list,
-                  size,
-                  "Assembly-CSharp",
-                  "Solis.Common.Proto.Api",
-                  "Deck",
-                  "DeckClient",
-                  "SaveAsync",
-                  4,
-                  (void *) deckClientSaveAsync,
-                  (void **) &deckClientSaveAsyncBackup);
 
     hackOneNested(assembly_list,
                   size,
