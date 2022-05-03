@@ -241,15 +241,15 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
-    hackOne(assembly_list,
-            size,
-            "Assembly-CSharp",
-            "Solis.Common.Network",
-            "Api",
-            "GetSSLRootCertificates",
-            -1,
-            (void *) getSSLRootCertificates,
-            (void **) &getSSLRootCertificatesBackup);
+//    hackOne(assembly_list,
+//            size,
+//            "Assembly-CSharp",
+//            "Solis.Common.Network",
+//            "Api",
+//            "GetSSLRootCertificates",
+//            -1,
+//            (void *) getSSLRootCertificates,
+//            (void **) &getSSLRootCertificatesBackup);
 
     hackOne(assembly_list,
             size,
