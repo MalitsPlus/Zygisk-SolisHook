@@ -67,6 +67,12 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             flag = 0;
             break;
         }
+        case 8: {
+            string filename = "iprhook/homeLogin" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
         case 101: {
             string filename = "iprhook/noticeList" + currentDateTime() + ".bin";
             writeByte2File(filename.c_str(), bytes->buf, bytes->length);
@@ -206,6 +212,19 @@ void* noticeFetchAsync(void* self, void* request, void* headers, void* deadline,
     return r;
 }
 
+void* (*homeLoginAsyncBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* homeLoginAsync(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(homeLoginAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling homeLoginAsync");
+    if (flag == 0) {
+        flag = 8;
+    }
+    void* r = homeLoginAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
 cSharpString* (*getSSLRootCertificatesBackup) (void* self, void* method) = nullptr;
 cSharpString* getSSLRootCertificates(void* self, void* method) {
     if(getSSLRootCertificatesBackup == nullptr){
@@ -332,6 +351,17 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
                   4,
                   (void *) masterClientGetAsync,
                   (void **) &masterClientGetAsyncBackup);
+
+//    hackOneNested(assembly_list,
+//                  size,
+//                  "Assembly-CSharp",
+//                  "Solis.Common.Proto.Api",
+//                  "Home",
+//                  "HomeClient",
+//                  "LoginAsync",
+//                  4,
+//                  (void *) homeLoginAsync,
+//                  (void **) &homeLoginAsyncBackup);
 
 //    hackOneNested(assembly_list,
 //                  size,
