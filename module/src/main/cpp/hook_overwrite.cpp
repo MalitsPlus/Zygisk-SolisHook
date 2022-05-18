@@ -236,20 +236,41 @@ cSharpString* getSSLRootCertificates(void* self, void* method) {
     return alter;
 }
 
+void* (*signInAsyncBackup) (void* self, cSharpString* token, void* method) = nullptr;
+void* signInAsync(void* self, cSharpString* token, void* method) {
+    if(signInAsyncBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling signInAsync");
+    LOGI("token is %s", token->buf);
+    void* r = signInAsyncBackup(self, token, method);
+    return r;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
 
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+    hackOne(assembly_list,
+            size,
+            "Assembly-CSharp",
+            "Solis.Common.Network",
+            "Api",
+            "GetSSLRootCertificates",
+            -1,
+            (void *) getSSLRootCertificates,
+            (void **) &getSSLRootCertificatesBackup);
+
 //    hackOne(assembly_list,
 //            size,
-//            "Assembly-CSharp",
-//            "Solis.Common.Network",
-//            "Api",
-//            "GetSSLRootCertificates",
+//            "Firebase.Auth",
+//            "Firebase.Auth",
+//            "FirebaseAuth",
+//            "SignInWithCustomTokenAsync",
 //            -1,
-//            (void *) getSSLRootCertificates,
-//            (void **) &getSSLRootCertificatesBackup);
+//            (void *) signInAsync,
+//            (void **) &signInAsyncBackup);
 
     hackOne(assembly_list,
             size,
