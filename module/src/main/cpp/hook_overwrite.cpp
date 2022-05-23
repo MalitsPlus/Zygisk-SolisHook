@@ -247,20 +247,46 @@ void* signInAsync(void* self, cSharpString* token, void* method) {
     return r;
 }
 
+void* (*nativeDecryptBackup) (void* self, int32_t padding, cSharpByteArray* cipher, int32_t offset, int32_t length, cSharpByteArray* key, cSharpByteArray* iv, void* method) = nullptr;
+void* nativeDecrypt(void* self, int32_t padding, cSharpByteArray* cipher, int32_t offset, int32_t length, cSharpByteArray* key, cSharpByteArray* iv, void* method) {
+    if(nativeDecryptBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("===calling nativeDecrypt===");
+    LOGI("padding is %d", padding);
+    LOGI("offset is %d", offset);
+    LOGI("length is %d", length);
+    LOGI("key is %s", getCsByteString(key).c_str());
+    LOGI("iv is %s", getCsByteString(iv).c_str());
+    void* r = nativeDecryptBackup(self, padding, cipher, offset, length, key, iv, method);
+    LOGI("===end nativeDecrypt===");
+    return r;
+}
+
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
 
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
     // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+//    hackOne(assembly_list,
+//            size,
+//            "Assembly-CSharp",
+//            "Solis.Common.Network",
+//            "Api",
+//            "GetSSLRootCertificates",
+//            -1,
+//            (void *) getSSLRootCertificates,
+//            (void **) &getSSLRootCertificatesBackup);
+
     hackOne(assembly_list,
             size,
-            "Assembly-CSharp",
-            "Solis.Common.Network",
-            "Api",
-            "GetSSLRootCertificates",
+            "Octo",
+            "",
+            "FastAES",
+            "NativeDecrypt",
             -1,
-            (void *) getSSLRootCertificates,
-            (void **) &getSSLRootCertificatesBackup);
+            (void *) nativeDecrypt,
+            (void **) &nativeDecryptBackup);
 
 //    hackOne(assembly_list,
 //            size,
