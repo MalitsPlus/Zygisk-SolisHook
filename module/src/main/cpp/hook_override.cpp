@@ -215,10 +215,10 @@ cSharpString* getSSLRootCertificates(void* self, void* method) {
 }
 
 void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
-
-    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
-    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
-    // WARNING: BE AWARE WHAT ARE YOU DOING TO ENABLE THIS LINE !!!
+    // WARNING: This is not a instrumental hook function, which means it will
+    // definitely modify your in-game data. It is highly recommended that
+    // do not enable this line if you treasure your account, unless you
+    // understand exactly what you are doing.
 //    hackOne(assembly_list,
 //            size,
 //            "Assembly-CSharp",
@@ -259,25 +259,25 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
             (void *) encrypt,
             (void **) &encryptBackup);
 
-    hackOne(assembly_list,
-            size,
-            "Assembly-CSharp",
-            "Solis.Common.Proto.Api",
-            "QuestStartRequest",
-            ".ctor",
-            -1,
-            (void *) questStartRequest,
-            (void **) &questStartRequestBackup);
+//    hackOne(assembly_list,
+//            size,
+//            "Assembly-CSharp",
+//            "Solis.Common.Proto.Api",
+//            "QuestStartRequest",
+//            ".ctor",
+//            -1,
+//            (void *) questStartRequest,
+//            (void **) &questStartRequestBackup);
 
-    hackOne(assembly_list,
-            size,
-            "Assembly-CSharp",
-            "Solis.Common.Proto.Api",
-            "TourAreaLiveRequest",
-            ".ctor",
-            -1,
-            (void *) tourAreaLiveRequest,
-            (void **) &tourAreaLiveRequestBackup);
+//    hackOne(assembly_list,
+//            size,
+//            "Assembly-CSharp",
+//            "Solis.Common.Proto.Api",
+//            "TourAreaLiveRequest",
+//            ".ctor",
+//            -1,
+//            (void *) tourAreaLiveRequest,
+//            (void **) &tourAreaLiveRequestBackup);
 
     hackOne(assembly_list,
             size,
@@ -310,16 +310,16 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
                   (void *) userClientGetAsync,
                   (void **) &userClientGetAsyncBackup);
 
-    hackOneNested(assembly_list,
-                  size,
-                  "Assembly-CSharp",
-                  "Solis.Common.Proto.Api",
-                  "Master",
-                  "MasterClient",
-                  "GetAsync",
-                  4,
-                  (void *) masterClientGetAsync,
-                  (void **) &masterClientGetAsyncBackup);
+//    hackOneNested(assembly_list,
+//                  size,
+//                  "Assembly-CSharp",
+//                  "Solis.Common.Proto.Api",
+//                  "Master",
+//                  "MasterClient",
+//                  "GetAsync",
+//                  4,
+//                  (void *) masterClientGetAsync,
+//                  (void **) &masterClientGetAsyncBackup);
 
 //    hackOneNested(assembly_list,
 //                  size,
