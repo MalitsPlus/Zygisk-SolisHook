@@ -77,6 +77,24 @@ cSharpByteArray* decrypt(void* self, cSharpByteArray* bytes, int32_t offset, int
             flag = 0;
             break;
         }
+        case 31: {
+            string filename = "iprhook/pvpTop" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
+        case 32: {
+            string filename = "iprhook/gvgTop" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
+        case 33: {
+            string filename = "iprhook/leagueTop" + currentDateTime() + ".bin";
+            writeByte2File(filename.c_str(), bytes->buf, bytes->length);
+            flag = 0;
+            break;
+        }
         default: break;
     }
 
@@ -181,6 +199,45 @@ void* masterClientGetAsync(void* self, void* request, void* headers, void* deadl
         flag = 6;
     }
     void* r = masterClientGetAsyncBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
+void* (*pvpTopBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* pvpTop(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(pvpTopBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling pvpTop");
+    if (flag == 0) {
+        flag = 31;
+    }
+    void* r = pvpTopBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
+void* (*gvgTopBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* gvgTop(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(gvgTopBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling gvgTop");
+    if (flag == 0) {
+        flag = 32;
+    }
+    void* r = gvgTopBackup(self, request, headers, deadline, cancellationToken, method);
+    return r;
+}
+
+void* (*leagueTopBackup) (void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) = nullptr;
+void* leagueTop(void* self, void* request, void* headers, void* deadline, void* cancellationToken, void* method) {
+    if(leagueTopBackup == nullptr){
+        LOGE("backup DOES NOT EXIST");
+    }
+    LOGI("calling leagueTop");
+    if (flag == 0) {
+        flag = 33;
+    }
+    void* r = leagueTopBackup(self, request, headers, deadline, cancellationToken, method);
     return r;
 }
 
@@ -331,4 +388,37 @@ void hackMain(const Il2CppAssembly** assembly_list, unsigned long size) {
 //                  4,
 //                  (void *) noticeFetchAsync,
 //                  (void **) &noticeFetchAsyncBackup);
+
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "Pvp",
+                  "PvpClient",
+                  "TopAsync",
+                  4,
+                  (void *) pvpTop,
+                  (void **) &pvpTopBackup);
+
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "Gvg",
+                  "GvgClient",
+                  "TopAsync",
+                  4,
+                  (void *) gvgTop,
+                  (void **) &gvgTopBackup);
+
+    hackOneNested(assembly_list,
+                  size,
+                  "Assembly-CSharp",
+                  "Solis.Common.Proto.Api",
+                  "League",
+                  "LeagueClient",
+                  "TopAsync",
+                  4,
+                  (void *) leagueTop,
+                  (void **) &leagueTopBackup);
 }
